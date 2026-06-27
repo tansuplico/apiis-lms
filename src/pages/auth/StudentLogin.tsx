@@ -11,7 +11,6 @@ export default function StudentLogin() {
           Student Login
         </h1>
       </div>
-
       <StudentLoginForm />
 
       <p className="text-center text-sm text-gray-500 mt-8">
