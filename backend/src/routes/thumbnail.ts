@@ -2,8 +2,10 @@
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { authenticate, authorize } from "../middleware/auth";
+import { THUMBNAILS_DIR } from "../config/uploadPaths";
 import {
   listThumbnails,
   serveThumbnail,
@@ -15,7 +17,9 @@ import {
 const router = Router();
 
 // ── Multer configuration
-const THUMBNAILS_DIR = path.join(__dirname, "../../uploads/thumbnails");
+if (!fs.existsSync(THUMBNAILS_DIR)) {
+  fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, THUMBNAILS_DIR),

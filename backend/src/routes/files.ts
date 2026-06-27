@@ -2,8 +2,10 @@
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { authenticate, authorize } from "../middleware/auth";
+import { FILES_DIR } from "../config/uploadPaths";
 import {
   uploadModuleFile,
   deleteModuleFile,
@@ -13,7 +15,9 @@ import {
 const router = Router();
 
 // ── Multer configuration
-const FILES_DIR = path.join(__dirname, "../../uploads/files");
+if (!fs.existsSync(FILES_DIR)) {
+  fs.mkdirSync(FILES_DIR, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, FILES_DIR),

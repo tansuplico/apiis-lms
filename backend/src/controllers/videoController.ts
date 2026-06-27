@@ -5,10 +5,9 @@ import path from "path";
 import fs from "fs";
 import { AuthRequest } from "../middleware/auth";
 import jwt from "jsonwebtoken";
+import { VIDEOS_DIR } from "../config/uploadPaths";
 
 // ── Constants
-const VIDEOS_DIR = path.join(__dirname, "../../uploads/videos");
-
 // Ensure upload dir exists on startup
 if (!fs.existsSync(VIDEOS_DIR)) {
   fs.mkdirSync(VIDEOS_DIR, { recursive: true });

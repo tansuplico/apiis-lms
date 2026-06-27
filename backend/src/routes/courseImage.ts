@@ -9,7 +9,8 @@ import {
   serveContentImage,
 } from "../controllers/courseImageController";
 
-const CONTENT_IMAGES_DIR = path.join(__dirname, "../../uploads/content-images");
+import { CONTENT_IMAGES_DIR } from "../config/uploadPaths";
+
 if (!fs.existsSync(CONTENT_IMAGES_DIR)) {
   fs.mkdirSync(CONTENT_IMAGES_DIR, { recursive: true });
 }

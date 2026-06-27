@@ -1,8 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import path from "path";
-
-const CONTENT_IMAGES_DIR = path.join(__dirname, "../../uploads/content-images");
+import { CONTENT_IMAGES_DIR } from "../config/uploadPaths";
 
 export async function uploadContentImage(req: AuthRequest, res: Response) {
   try {

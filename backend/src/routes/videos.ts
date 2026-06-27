@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { authenticate, authorize } from "../middleware/auth";
+import { VIDEOS_DIR } from "../config/uploadPaths";
 import {
   uploadModuleVideo,
   deleteModuleVideo,
@@ -15,8 +16,6 @@ import {
 const router = Router();
 
 // ── Multer configuration
-const VIDEOS_DIR = path.join(__dirname, "../../uploads/videos");
-
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, VIDEOS_DIR),
   filename: (_req, file, cb) => {

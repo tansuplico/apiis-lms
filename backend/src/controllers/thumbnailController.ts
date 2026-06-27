@@ -3,9 +3,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import path from "path";
 import fs from "fs";
-
-// ── Constants
-const THUMBNAILS_DIR = path.join(__dirname, "../../uploads/thumbnails");
+import { THUMBNAILS_DIR } from "../config/uploadPaths";
 
 // ── List Thumbnails
 export async function listThumbnails(req: AuthRequest, res: Response) {

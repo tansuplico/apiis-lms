@@ -6,7 +6,7 @@ import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
 
 // ── Constants
-const SUBMISSIONS_DIR = path.resolve(__dirname, "../../uploads/submissions");
+import { SUBMISSIONS_DIR } from "../config/uploadPaths";
 const MAX_ALLOWED_FILES = 20;
 
 // ── Helpers: facilitator/admin ownership of a module

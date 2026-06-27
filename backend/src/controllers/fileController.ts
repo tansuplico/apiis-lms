@@ -4,9 +4,9 @@ import path from "path";
 import fs from "fs";
 import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
+import { FILES_DIR } from "../config/uploadPaths";
 
 // ── Constants
-const FILES_DIR = path.resolve(__dirname, "../../uploads/files");
 const MAX_TITLE_LENGTH = 200;
 
 // ── Helpers
