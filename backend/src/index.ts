@@ -68,11 +68,14 @@ app.use(
   }),
 );
 
+const defaultTauriOrigins = ["tauri://localhost", "http://tauri.localhost"];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : defaultTauriOrigins;
+
 app.use(
   cors({
-    origin: isDev
-      ? "*"
-      : (process.env.ALLOWED_ORIGIN ?? "https://yourdomain.com"),
+    origin: isDev ? "*" : allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
