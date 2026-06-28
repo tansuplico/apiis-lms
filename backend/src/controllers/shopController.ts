@@ -345,7 +345,7 @@ export const purchaseShopItem = async (req: AuthRequest, res: Response) => {
     }
 
     const itemResult = await pool.query(
-      `SELECT id, name, category, price, color, avatar_url FROM shop_items WHERE id = $1`,
+      `SELECT id, name, category, price, color, avatar_url, target_role FROM shop_items WHERE id = $1`,
       [id],
     );
     if (itemResult.rows.length === 0) {

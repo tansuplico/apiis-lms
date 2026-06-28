@@ -1,6 +1,5 @@
 // src/services/apiClient.ts
 import { tokenStorage } from "./tokenStorage";
-import { markOffline } from "./networkStatus";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
@@ -68,9 +67,6 @@ async function request<T>(
 
     return data;
   } catch (err) {
-    if (!(err instanceof ApiError)) {
-      markOffline();
-    }
     throw err;
   }
 }

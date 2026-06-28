@@ -5,7 +5,11 @@ import { ToastContainer } from "react-toastify";
 import FacilitatorSidebar from "./FacilitatorSidebar";
 import { useEffect, useRef, useState } from "react";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import {
+  isOnline,
+  onNetworkChange,
+  startNetworkPolling,
+} from "@/services/networkStatus";
 
 export default function FacilitatorLayout() {
   // ── Store
@@ -17,7 +21,7 @@ export default function FacilitatorLayout() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [historyLength, setHistoryLength] = useState(1);
   const isPopNav = useRef(false);
-  const online = useOnlineStatus();
+  const [online, setOnline] = useState(isOnline());
 
   // ── Effects: track location changes for forward/back
   useEffect(() => {
@@ -31,6 +35,19 @@ export default function FacilitatorLayout() {
       return newIndex;
     });
   }, [location.key]);
+
+  // ── Effects: network status
+  useEffect(() => {
+    startNetworkPolling((nowOnline) => {
+      setOnline(nowOnline);
+    });
+
+    const unsubscribe = onNetworkChange((nowOnline) => {
+      setOnline(nowOnline);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // ── Derived
   const canGoBack = historyIndex > 1;

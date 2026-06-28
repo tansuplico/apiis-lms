@@ -6,7 +6,6 @@ import StudentSidebar from "./StudentSidebar";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useEffect, useRef, useState } from "react";
 import {
-  checkOnline,
   isOnline,
   onNetworkChange,
   startNetworkPolling,
@@ -57,8 +56,6 @@ export default function StudentLayout() {
 
   // ── Effects: network status polling & events
   useEffect(() => {
-    checkOnline().then(setOnline);
-
     startNetworkPolling((nowOnline) => {
       setOnline(nowOnline);
     });

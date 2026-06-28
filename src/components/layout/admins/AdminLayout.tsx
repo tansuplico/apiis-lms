@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import AdminSidebar from "./AdminSidebar";
 import { useAdminStore } from "@/stores/useAdminStore";
 import {
-  checkOnline,
   isOnline,
   onNetworkChange,
   startNetworkPolling,
@@ -41,8 +40,6 @@ export default function AdminLayout() {
 
   // ── Effects: network status
   useEffect(() => {
-    checkOnline().then(setOnline);
-
     startNetworkPolling((nowOnline) => {
       setOnline(nowOnline);
     });

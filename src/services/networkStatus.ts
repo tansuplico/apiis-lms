@@ -4,9 +4,9 @@ const HEALTH_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace("/api", "")}/health`
   : "http://localhost:3000/health";
 
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 8000;
 const POLL_INTERVAL_MS = 30000;
-const FAIL_THRESHOLD = 1;
+const FAIL_THRESHOLD = 2;
 
 let _cachedOnline: boolean = true;
 let _pollingStarted = false;
@@ -63,10 +63,10 @@ export function startNetworkPolling(onStatusChange: (online: boolean) => void) {
   _pollingStarted = true;
 
   setInterval(async () => {
-    const wasOnline = _cachedOnline;
+    if (_cachedOnline) return;
     const nowOnline = await checkOnline();
-    if (wasOnline !== nowOnline) {
-      onStatusChange(nowOnline);
+    if (nowOnline) {
+      onStatusChange(true);
     }
   }, POLL_INTERVAL_MS);
 }
@@ -79,5 +79,7 @@ export function resetNetworkState() {
 
 export function markOffline(): void {
   _failCount++;
-  _cachedOnline = false;
+  if (_failCount >= FAIL_THRESHOLD) {
+    _cachedOnline = false;
+  }
 }
