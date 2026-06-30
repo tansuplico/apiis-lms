@@ -21,6 +21,8 @@
     "fs:allow-appdata-write",
     "fs:allow-appdata-write-recursive",
     "fs:allow-appdata-meta",
-    "fs:allow-appdata-meta-recursive"
+    "fs:allow-appdata-meta-recursive",
+    "updater:default",
+    "process:default"
   ]
 }
