@@ -19,7 +19,7 @@ export function resolveProfilePicture(
 ): string | null {
   if (!url) return null;
   if (url.startsWith("/api/")) {
-    return `${(import.meta.env.VITE_API_URL as string).replace("/api", "")}${url}`;
+    return `${(import.meta.env.VITE_API_URL as string).replace(/\/api$/, "")}${url}`;
   }
   return url;
 }
@@ -28,7 +28,7 @@ export function resolveThumbnailUrl(url: string | null | undefined): string {
   if (!url || url.trim() === "") return "/module-thumbnail.png";
   if (url.startsWith("data:")) return url;
   if (url.startsWith("/api/")) {
-    const base = (import.meta.env.VITE_API_URL as string).replace("/api", "");
+    const base = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");
     return `${base}${url}`;
   }
   if (url.startsWith("http")) return url;

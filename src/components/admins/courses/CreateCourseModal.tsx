@@ -7,13 +7,14 @@ import { COURSE_CATEGORIES } from "@/data/courseCategories";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { tokenStorage } from "@/services/tokenStorage";
 import { extractThumbnailFilename } from "@/utils/thumbnailHelper";
+import { resolveThumbnailUrl } from "@/utils/imageUtils";
 
 interface CreateCourseModalProps {
   onClose: () => void;
 }
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string).replace("/api", "");
-
+// const BASE_URL = (import.meta.env.VITE_API_URL as string).replace("/api", "");
+const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");
 const getLevelColor = (level: string) => {
   switch (level) {
     case "Easy":
@@ -273,7 +274,7 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               )}
               {thumbnailUrl ? (
                 <img
-                  src={thumbnailUrl}
+                  src={resolveThumbnailUrl(thumbnailUrl)}
                   alt="Course thumbnail"
                   className="w-full h-full object-cover"
                   onError={(e) => {

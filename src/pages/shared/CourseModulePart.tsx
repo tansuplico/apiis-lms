@@ -163,18 +163,27 @@ export default function CourseModulePart() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    // Convert to base64 so the image is embedded directly in the content HTML
+    // as <img src="data:image/...;base64,...">. This means it works offline
+    // and in production (no Vite proxy, no server fetch needed at display time).
+    // We still upload to the server for persistence, but TipTap uses the base64.
     const token = await tokenStorage.getToken();
     const formData = new FormData();
     formData.append("image", file);
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
+
+    // Fire-and-forget server upload for persistence — don't await or block on it
+    fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
+    }).catch(() => {});
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read image file."));
+      reader.readAsDataURL(file);
     });
-    const json = await res.json();
-    if (!res.ok || !json.success)
-      throw new Error(json.message ?? "Image upload failed.");
-    return json.data.url;
   };
 
   // ── Render

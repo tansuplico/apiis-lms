@@ -5,20 +5,17 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import { authenticate, authorize } from "../middleware/auth";
+import { CENTER_THUMBNAILS_DIR } from "../config/uploadPaths";
 
 // ── Router setup
 const router = Router();
 
-// ── Multer configuration
-const CENTER_THUMBNAILS_DIR = path.join(
-  __dirname,
-  "../../uploads/center-thumbnails",
-);
-
+// ── Ensure upload dir exists
 if (!fs.existsSync(CENTER_THUMBNAILS_DIR)) {
   fs.mkdirSync(CENTER_THUMBNAILS_DIR, { recursive: true });
 }
 
+// ── Multer configuration
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, CENTER_THUMBNAILS_DIR),
   filename: (_req, file, cb) => {

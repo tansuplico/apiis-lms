@@ -5,8 +5,9 @@ import { toast } from "react-toastify";
 import { tokenStorage } from "@/services/tokenStorage";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCenterStore } from "@/stores/useCenterStore";
+import { resolveThumbnailUrl } from "@/utils/imageUtils";
 
-const BASE_URL = import.meta.env.VITE_API_URL as string;
+const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");
 
 const EMPTY_CENTER = {
   title: "",
@@ -32,11 +33,7 @@ export default function CreateCenterModal({
   const online = useOnlineStatus();
 
   // ── Derived: thumbnail preview URL
-  const previewSrc = newCenter.thumbnailUrl
-    ? newCenter.thumbnailUrl.startsWith("/api/")
-      ? `${BASE_URL.replace("/api", "")}${newCenter.thumbnailUrl}`
-      : newCenter.thumbnailUrl
-    : null;
+  const previewSrc = resolveThumbnailUrl(newCenter.thumbnailUrl || null);
 
   // ── Handlers: form submission & thumbnail upload
   const handleCreateCenter = async (e: React.FormEvent) => {
