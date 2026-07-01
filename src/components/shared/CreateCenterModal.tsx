@@ -57,7 +57,7 @@ export default function CreateCenterModal({
       const formData = new FormData();
       formData.append("thumbnail", file);
 
-      const res = await fetch(`${BASE_URL}/center-thumbnails`, {
+      const res = await fetch(`${BASE_URL}/api/center-thumbnails`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -147,7 +147,7 @@ export default function CreateCenterModal({
             </label>
 
             <div className="relative w-full max-w-xs aspect-video rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
-              {previewSrc ? (
+              {newCenter.thumbnailUrl ? (
                 <img
                   src={previewSrc}
                   alt="Center thumbnail"
@@ -191,7 +191,7 @@ export default function CreateCenterModal({
                   </>
                 )}
               </button>
-              {previewSrc && !uploading && (
+              {newCenter.thumbnailUrl && !uploading && (
                 <button
                   type="button"
                   onClick={() =>

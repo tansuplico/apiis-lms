@@ -51,7 +51,10 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
   for (const course of courses) {
     let localThumbnail = course.thumbnailUrl ?? null;
     if (localThumbnail && !localThumbnail.startsWith("data:")) {
-      const base = (import.meta.env.VITE_API_URL as string).replace("/api", "");
+      const base = (import.meta.env.VITE_API_URL as string).replace(
+        /\/api$/,
+        "",
+      );
       const fullUrl = localThumbnail.startsWith("http")
         ? localThumbnail
         : `${base}${localThumbnail}`;

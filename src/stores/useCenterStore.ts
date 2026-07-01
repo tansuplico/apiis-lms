@@ -87,18 +87,7 @@ export const useCenterStore = create<CenterStore>()((set, get) => ({
   updateCenter: async (centerId, updates) => {
     try {
       await centerService.update(centerId, updates);
-      const base = (import.meta.env.VITE_API_URL as string).replace("/api", "");
-      const resolvedUpdates = {
-        ...updates,
-        ...(updates.thumbnailUrl?.startsWith("/api/") && {
-          thumbnailUrl: `${base}${updates.thumbnailUrl}`,
-        }),
-      };
-      set((state) => ({
-        centers: state.centers.map((c) =>
-          c.id === centerId ? { ...c, ...resolvedUpdates } : c,
-        ),
-      }));
+      await get().fetchCenters();
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update center.");
       throw err;

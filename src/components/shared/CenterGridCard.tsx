@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Center } from "@/types/types";
 import { useCenterCard } from "@/hooks/useCenterCard";
+import { resolveThumbnailUrl } from "@/utils/imageUtils";
 
 const CENTER_ROUTES: Record<string, string> = {
   admin: "/admin/centers",
@@ -68,7 +69,7 @@ export default function CenterGridCard({
         )}
 
         <img
-          src={center.thumbnailUrl ?? "/module-thumbnail.png"}
+          src={resolveThumbnailUrl(center.thumbnailUrl)}
           alt={`${center.title} thumbnail`}
           className="absolute inset-0 w-full h-full object-cover"
           loading="lazy"
