@@ -52,7 +52,10 @@ export const useCenterStore = create<CenterStore>()((set, get) => ({
     set({ isLoading: true });
     try {
       const centers = await centerService.getAll();
-      const base = (import.meta.env.VITE_API_URL as string).replace("/api", "");
+      const base = (import.meta.env.VITE_API_URL as string).replace(
+        /\/api$/,
+        "",
+      );
       const resolvedCenters: Center[] = await Promise.all(
         centers.map(async (center: Center) => {
           if (!center.thumbnailUrl?.startsWith("/api/")) return center;
