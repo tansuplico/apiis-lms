@@ -22,19 +22,11 @@ import { Facilitator } from "@/types/types";
 const ITEMS_PER_PAGE = 10;
 
 // ── Sub-component: FacilitatorAvatar
-// Mirrors the canonical avatar pattern used elsewhere (StudentAvatar in
-// AddStudentModal.tsx / AttendanceTab.tsx) — real photo when available,
-// online, and not errored; otherwise an initial-letter fallback. Uses the
-// purple/indigo gradient established for facilitators (ProfileBanner,
-// PhotoModal), replacing the old solid bg-blue-500 fill. Also fixes the
-// previous onError handler, which set img.src = "" — an empty src renders
-// a blank broken-image box, not a fallback; this tracks hasError as real
-// state and swaps to the gradient/initial view instead.
 function FacilitatorAvatar({ facilitator }: { facilitator: Facilitator }) {
   const [hasError, setHasError] = useState(false);
   const online = useOnlineStatus();
   const src = facilitator.profilePicture?.startsWith("/api/")
-    ? `${(import.meta.env.VITE_API_URL as string).replace("/api", "")}${facilitator.profilePicture}`
+    ? `${(import.meta.env.VITE_API_URL as string).replace(/\/api$/, "")}${facilitator.profilePicture}`
     : facilitator.profilePicture;
 
   if (!src || !online || hasError) {

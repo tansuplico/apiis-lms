@@ -20,9 +20,6 @@ const ITEMS_PER_PAGE = 10;
 type FilterType = "all" | "center" | "facilitator";
 
 // ── Sub-component: AttendanceRecordsSkeleton
-// No shared skeleton exists for this table's specific column layout
-// (Date/Center/Present/Absent/Total/Actions), so it's built locally rather
-// than reusing a mismatched one from another table.
 function AttendanceRecordsSkeleton({ rows }: { rows: number }) {
   return (
     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

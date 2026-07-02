@@ -51,7 +51,7 @@ export const fileService = {
 
   download: async (fileId: number, originalFilename: string): Promise<void> => {
     const headers = await authHeaders();
-    const base = (BASE_URL as string).replace("/api", "");
+    const base = (BASE_URL as string).replace(/\/api$/, "");
 
     const res = await fetch(`${base}/api/files/${fileId}/download`, {
       headers,

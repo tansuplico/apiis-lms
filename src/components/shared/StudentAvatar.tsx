@@ -22,7 +22,7 @@ export default function StudentAvatar({
   const [hasError, setHasError] = useState(false);
   const online = useOnlineStatus();
   const src = student.profilePicture?.startsWith("/api/")
-    ? `${(import.meta.env.VITE_API_URL as string).replace("/api", "")}${student.profilePicture}`
+    ? `${(import.meta.env.VITE_API_URL as string).replace(/\/api$/, "")}${student.profilePicture}`
     : student.profilePicture;
 
   if (!src || !online || hasError) {

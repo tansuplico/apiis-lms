@@ -12,6 +12,7 @@ import { useRef, useState, useEffect } from "react";
 import { Upload, Loader2 } from "lucide-react";
 import { tokenStorage } from "@/services/tokenStorage";
 import { extractThumbnailFilename } from "@/utils/thumbnailHelper";
+import { resolveThumbnailUrl } from "@/utils/imageUtils";
 
 const BASE_URL = import.meta.env.VITE_API_URL as string;
 
@@ -270,7 +271,7 @@ export default function CoursePreview() {
                       )}
 
                       <img
-                        src={course.thumbnailUrl || "/module-thumbnail.png"}
+                        src={resolveThumbnailUrl(course.thumbnailUrl)}
                         alt="thumbnail"
                         className="w-full aspect-video object-cover rounded-xl shadow-lg"
                         onError={(e) => {
