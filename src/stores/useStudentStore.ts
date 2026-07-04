@@ -29,7 +29,7 @@ interface StudentStore {
   logout: () => Promise<void>;
   restoreSession: () => Promise<{ coursesFetched: boolean }>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
-  updateProfile: (data: Partial<Student>) => Promise<void>;
+  updateProfile: (data: Partial<Student>) => Promise<boolean>;
   completePart: (
     courseId: number,
     partSlug: string,
@@ -177,8 +177,10 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       await studentService.updateProfile(data);
       const current = get().currentStudent;
       if (current) set({ currentStudent: { ...current, ...data } });
+      return true;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update profile.");
+      return false;
     }
   },
 

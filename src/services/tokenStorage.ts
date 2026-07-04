@@ -4,11 +4,15 @@ import { Store } from "@tauri-apps/plugin-store";
 const STORE_PATH = "auth.dat";
 
 let storeInstance: Store | null = null;
+let storeLoadPromise: Promise<Store> | null = null;
 
 const getStore = async (): Promise<Store> => {
-  if (!storeInstance) {
-    storeInstance = await Store.load(STORE_PATH);
+  if (storeInstance) return storeInstance;
+
+  if (!storeLoadPromise) {
+    storeLoadPromise = Store.load(STORE_PATH);
   }
+  storeInstance = await storeLoadPromise;
   return storeInstance;
 };
 

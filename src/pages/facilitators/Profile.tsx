@@ -27,8 +27,9 @@ export default function Profile() {
 
   // ── Handlers: update cover / profile picture
   const handleSelectCoverColor = async (color: string) => {
-    await updateProfile({ coverColor: color });
     setShowModal(null);
+    const success = await updateProfile({ coverColor: color });
+    if (!success) return;
     toast.success("Cover color updated!", {
       position: "bottom-right",
       autoClose: 3000,
@@ -36,9 +37,10 @@ export default function Profile() {
     });
   };
 
-  const handleSelectProfilePicture = (avatarUrl: string) => {
-    updateProfile({ profilePicture: avatarUrl || null });
+  const handleSelectProfilePicture = async (avatarUrl: string) => {
     setShowModal(null);
+    const success = await updateProfile({ profilePicture: avatarUrl || null });
+    if (!success) return;
     toast.success("Profile photo updated!", {
       position: "bottom-right",
       autoClose: 3000,

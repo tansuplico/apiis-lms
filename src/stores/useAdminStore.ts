@@ -18,7 +18,7 @@ interface AdminStore {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
-  updateProfile: (data: Partial<Admin>) => Promise<void>;
+  updateProfile: (data: Partial<Admin>) => Promise<boolean>;
   restoreSession: () => Promise<void>;
 }
 
@@ -105,8 +105,10 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
       if (current) {
         set({ currentAdmin: { ...current, ...data } });
       }
+      return true;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update profile.");
+      return false;
     }
   },
 }));

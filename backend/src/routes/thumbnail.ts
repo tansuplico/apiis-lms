@@ -49,14 +49,19 @@ router.get(
   serveThumbnail,
 );
 
-// ── Admin routes
+// ── Admin + facilitator routes
 router.post(
   "/",
   authenticate,
-  authorize("admin"),
+  authorize("admin", "facilitator"),
   upload.single("thumbnail"),
   uploadThumbnail,
 );
-router.delete("/:filename", authenticate, authorize("admin"), deleteThumbnail);
+router.delete(
+  "/:filename",
+  authenticate,
+  authorize("admin", "facilitator"),
+  deleteThumbnail,
+);
 
 export default router;

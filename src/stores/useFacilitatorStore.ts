@@ -18,7 +18,7 @@ interface FacilitatorStore {
   logout: () => Promise<void>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
   updatePasswordForced: (newPassword: string) => Promise<boolean>;
-  updateProfile: (data: Partial<Facilitator>) => Promise<void>;
+  updateProfile: (data: Partial<Facilitator>) => Promise<boolean>;
   restoreSession: () => Promise<void>;
 }
 
@@ -115,8 +115,10 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
       await facilitatorService.updateProfile(data);
       const current = get().currentFacilitator;
       if (current) set({ currentFacilitator: { ...current, ...data } });
+      return true;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update profile.");
+      return false;
     }
   },
 }));

@@ -35,7 +35,12 @@ router.get(
 
 // ── Course CRUD (admin only)
 router.post("/", authenticate, authorize("admin"), createCourse);
-router.put("/:id", authenticate, authorize("admin"), updateCourse);
+router.put(
+  "/:id",
+  authenticate,
+  authorize("admin", "facilitator"),
+  updateCourse,
+);
 router.delete("/:id", authenticate, authorize("admin"), deleteCourse);
 
 // ── Module management (admin & facilitator)

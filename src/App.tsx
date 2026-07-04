@@ -41,7 +41,7 @@ import FacilitatorViewCenter from "@/pages/facilitators/ViewCenter";
 import FacilitatorCoursePreview from "@/pages/facilitators/CoursePreview";
 import FacilitatorProfile from "@/pages/facilitators/Profile";
 import FacilitatorAttendance from "@pages/facilitators/Attendance";
-import FacilitatorAttendanceDetail from "@pages/facilitators/AttendanceDetail";
+import FacilitatorAttendanceDetail from "@/pages/shared/AttendanceDetail";
 import FacilitatorChangePassword from "@/pages/facilitators/ChangePassword";
 import FacilitatorStudents from "./pages/shared/Students";
 
@@ -58,7 +58,7 @@ import AdminCenters from "@/pages/admins/Centers";
 import AdminCoursePreview from "@/pages/admins/CoursePreview";
 import AdminViewCenter from "@/pages/admins/ViewCenter";
 import AdminAttendance from "@pages/admins/Attendance";
-import AdminAttendanceDetail from "@pages/admins/AttendanceDetail";
+import AdminAttendanceDetail from "@/pages/shared/AttendanceDetail";
 import AdminShop from "@pages/admins/Shop";
 
 import ChangePassword from "./pages/students/ChangePassword";

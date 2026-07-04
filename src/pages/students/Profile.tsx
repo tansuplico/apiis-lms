@@ -44,9 +44,10 @@ export default function Profile() {
   const allCoverColors = [...DEFAULT_COVER_COLORS, ...shopCoverColors];
 
   // ── Handlers
-  const handleSelectProfilePicture = (avatarUrl: string) => {
-    updateProfile({ profilePicture: avatarUrl });
+  const handleSelectProfilePicture = async (avatarUrl: string) => {
     setShowModal(null);
+    const success = await updateProfile({ profilePicture: avatarUrl });
+    if (!success) return; // error toast already handled by the store
     toast.success("Profile photo updated!", {
       position: "bottom-right",
       autoClose: 3000,
@@ -54,9 +55,10 @@ export default function Profile() {
     });
   };
 
-  const handleSelectCoverColor = (color: string) => {
-    updateProfile({ coverColor: color });
+  const handleSelectCoverColor = async (color: string) => {
     setShowModal(null);
+    const success = await updateProfile({ coverColor: color });
+    if (!success) return; // error toast already handled by the store
     toast.success("Cover color updated!", {
       position: "bottom-right",
       autoClose: 3000,

@@ -102,8 +102,8 @@ export default function CreateStudentModal({
       setShowNewPassword(false);
       onClose();
       onSuccess?.();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to create student.");
+    } catch {
+      // error toast handled by store (addStudent)
     } finally {
       setIsCreating(false);
     }

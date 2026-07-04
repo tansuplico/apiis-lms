@@ -55,7 +55,7 @@ export default function PersonalInfo({ role }: PersonalInfoProps) {
     });
   };
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     if (!editNameValues.firstName.trim() || !editNameValues.lastName.trim()) {
       toast.error("First and last name cannot be empty.");
       return;
@@ -68,10 +68,12 @@ export default function PersonalInfo({ role }: PersonalInfoProps) {
       return;
     }
 
-    updateName({
+    const success = await updateName({
       firstName: editNameValues.firstName.trim(),
       lastName: editNameValues.lastName.trim(),
     });
+    if (!success) return;
+
     toast.success("Name updated successfully!", {
       position: "bottom-right",
       autoClose: 3000,

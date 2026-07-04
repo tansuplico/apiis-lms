@@ -66,13 +66,9 @@ export default function EditFacilitatorModal({
     setIsEditing(true);
     try {
       await onUpdate(facilitatorToEdit.id, facilitatorToEdit);
-      toast.success(
-        `${facilitatorToEdit.firstName} ${facilitatorToEdit.lastName}'s info updated.`,
-        { position: "bottom-right" },
-      );
       onClose();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update facilitator.");
+    } catch {
+      // error toast handled by store
     } finally {
       setIsEditing(false);
     }

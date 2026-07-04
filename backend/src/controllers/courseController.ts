@@ -634,6 +634,7 @@ export const createCourse = async (req: Request, res: Response) => {
 // ── Update Course
 export const updateCourse = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { id } = req.params;
     const {
       title,
@@ -703,6 +704,8 @@ export const updateCourse = async (req: Request, res: Response) => {
       res.status(404).json({ success: false, message: "Course not found." });
       return;
     }
+
+    if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
 
     const updates: string[] = [];
     const values: any[] = [];

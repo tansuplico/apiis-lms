@@ -104,10 +104,8 @@ export default function AdminTickets() {
       await updateTicketStatus(selectedTicket.id, newStatus);
       setSelectedTicket((prev) => prev && { ...prev, status: newStatus });
       toast.success("Ticket status updated.", { position: "bottom-right" });
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update status.", {
-        position: "bottom-right",
-      });
+    } catch {
+      // error toast handled by store (updateTicketStatus)
     } finally {
       setIsUpdatingStatus(false);
     }

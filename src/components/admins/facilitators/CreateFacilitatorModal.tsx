@@ -1,7 +1,6 @@
 // src/components/admins/facilitators/CreateFacilitatorModal.tsx
 import { useState } from "react";
 import { X } from "lucide-react";
-import { toast } from "react-toastify";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface Props {
@@ -57,9 +56,7 @@ export default function CreateFacilitatorModal({
       resetForm();
       onClose();
     } catch {
-      toast.error("Failed to create facilitator. Please try again.", {
-        position: "bottom-right",
-      });
+      // error toast handled by store (addFacilitator)
     } finally {
       setIsCreating(false);
     }

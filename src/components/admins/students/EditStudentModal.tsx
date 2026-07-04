@@ -128,8 +128,8 @@ export default function EditStudentModal({
       );
       onClose();
       onSuccess?.();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update student.");
+    } catch {
+      // error toast handled by store (updateStudent)
     } finally {
       setIsEditing(false);
     }
