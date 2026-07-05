@@ -6,6 +6,8 @@ import {
   facilitatorLogin,
   adminLogin,
   changePassword,
+  forgotPassword,
+  resetPasswordWithCode,
 } from "../controllers/authController";
 import { authenticate } from "../middleware/auth";
 
@@ -39,6 +41,9 @@ const passwordChangeLimiter = rateLimit({
 router.post("/student/login", loginLimiter, studentLogin);
 router.post("/facilitator/login", loginLimiter, facilitatorLogin);
 router.post("/admin/login", loginLimiter, adminLogin);
+
+router.post("/forgot-password", loginLimiter, forgotPassword);
+router.post("/reset-password-with-code", loginLimiter, resetPasswordWithCode);
 
 // ── Protected routes
 router.post(

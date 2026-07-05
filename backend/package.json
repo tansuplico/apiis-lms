@@ -23,6 +23,7 @@
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
     "pg": "^8.19.0",
+    "resend": "^6.17.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.0"

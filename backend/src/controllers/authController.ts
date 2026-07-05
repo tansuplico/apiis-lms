@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "../config/db";
+import { sendPasswordResetEmail } from "../utils/emailService";
 
 // ── Constants
 const BCRYPT_ROUNDS = process.env.NODE_ENV === "production" ? 12 : 10;
@@ -14,6 +15,21 @@ const ROLE_TABLE_MAP: Record<string, string> = {
   facilitator: "facilitators",
   admin: "admins",
 };
+
+const COMMON_PASSWORDS = [
+  "12345678",
+  "password",
+  "password1",
+  "11111111",
+  "aaaaaaaa",
+  "qwerty123",
+  "abc12345",
+  "iloveyou1",
+  "admin123",
+  "letmein1",
+  "00000000",
+  "99999999",
+];
 
 // ── Helpers
 const generateToken = (id: number, role: string): string => {
@@ -59,6 +75,22 @@ const resetFailedAttempts = async (table: string, id: number) => {
     `UPDATE ${table} SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1`,
     [id],
   );
+};
+
+const validatePasswordStrength = (password: string): string | null => {
+  if (!password || password.length < 8) {
+    return "Password must be at least 8 characters.";
+  }
+  if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
+    return "Password is too common. Please choose a stronger password.";
+  }
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  if (!hasUppercase || !hasLowercase || !hasNumber) {
+    return "Password must contain at least one uppercase letter, one lowercase letter, and one number.";
+  }
+  return null;
 };
 
 // ── Student Login
@@ -374,45 +406,9 @@ export const changePassword = async (req: Request, res: Response) => {
         return;
       }
     } else {
-      if (newPassword.length < 8) {
-        res.status(400).json({
-          success: false,
-          message: "New password must be at least 8 characters.",
-        });
-        return;
-      }
-
-      const COMMON_PASSWORDS = [
-        "12345678",
-        "password",
-        "password1",
-        "11111111",
-        "aaaaaaaa",
-        "qwerty123",
-        "abc12345",
-        "iloveyou1",
-        "admin123",
-        "letmein1",
-        "00000000",
-        "99999999",
-      ];
-      const hasUppercase = /[A-Z]/.test(newPassword);
-      const hasLowercase = /[a-z]/.test(newPassword);
-      const hasNumber = /[0-9]/.test(newPassword);
-
-      if (COMMON_PASSWORDS.includes(newPassword.toLowerCase())) {
-        res.status(400).json({
-          success: false,
-          message: "Password is too common. Please choose a stronger password.",
-        });
-        return;
-      }
-      if (!hasUppercase || !hasLowercase || !hasNumber) {
-        res.status(400).json({
-          success: false,
-          message:
-            "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
-        });
+      const passwordError = validatePasswordStrength(newPassword);
+      if (passwordError) {
+        res.status(400).json({ success: false, message: passwordError });
         return;
       }
     }
@@ -481,6 +477,171 @@ export const changePassword = async (req: Request, res: Response) => {
       .json({ success: true, message: "Password changed successfully." });
   } catch (err) {
     console.error("changePassword error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// ── Forgot Password: request a reset code via email (admin/facilitator only)
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ success: false, message: "Email is required." });
+      return;
+    }
+
+    const genericResponse = () =>
+      res.status(200).json({
+        success: true,
+        message:
+          "If an account with that email exists, a reset code has been sent.",
+      });
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    let matchedRole: "admin" | "facilitator" | null = null;
+    let matchedEmail: string | null = null;
+
+    const facilitatorResult = await pool.query(
+      `SELECT email FROM facilitators WHERE email = $1`,
+      [normalizedEmail],
+    );
+    if (facilitatorResult.rows[0]) {
+      matchedRole = "facilitator";
+      matchedEmail = facilitatorResult.rows[0].email;
+    } else {
+      const adminResult = await pool.query(
+        `SELECT email FROM admins WHERE email = $1`,
+        [normalizedEmail],
+      );
+      if (adminResult.rows[0]) {
+        matchedRole = "admin";
+        matchedEmail = adminResult.rows[0].email;
+      }
+    }
+
+    if (!matchedRole || !matchedEmail) {
+      res.status(404).json({
+        success: false,
+        message: "This email is not registered.",
+      });
+      return;
+    }
+
+    const COOLDOWN_SECONDS = 60;
+
+    const recentRequest = await pool.query(
+      `SELECT created_at FROM password_resets
+       WHERE email = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [matchedEmail],
+    );
+
+    if (recentRequest.rows[0]) {
+      const secondsSinceLastRequest =
+        (Date.now() - new Date(recentRequest.rows[0].created_at).getTime()) /
+        1000;
+
+      if (secondsSinceLastRequest < COOLDOWN_SECONDS) {
+        const secondsRemaining = Math.ceil(
+          COOLDOWN_SECONDS - secondsSinceLastRequest,
+        );
+        res.status(429).json({
+          success: false,
+          message: `Please wait ${secondsRemaining} seconds before requesting another code.`,
+        });
+        return;
+      }
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await pool.query(
+      `INSERT INTO password_resets (email, role, code_hash, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [matchedEmail, matchedRole, codeHash, expiresAt],
+    );
+
+    try {
+      await sendPasswordResetEmail(matchedEmail, code);
+    } catch (emailErr) {
+      console.error("sendPasswordResetEmail error:", emailErr);
+    }
+
+    genericResponse();
+  } catch (err) {
+    console.error("forgotPassword error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// ── Reset Password with Code
+export const resetPasswordWithCode = async (req: Request, res: Response) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: "Email, code, and new password are required.",
+      });
+      return;
+    }
+
+    const passwordError = validatePasswordStrength(newPassword);
+    if (passwordError) {
+      res.status(400).json({ success: false, message: passwordError });
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const resetResult = await pool.query(
+      `SELECT id, role, code_hash FROM password_resets
+       WHERE email = $1 AND used_at IS NULL AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [normalizedEmail],
+    );
+
+    const resetRow = resetResult.rows[0];
+    if (!resetRow) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired code. Please request a new one.",
+      });
+      return;
+    }
+
+    const codeMatch = await bcrypt.compare(code, resetRow.code_hash);
+    if (!codeMatch) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired code. Please request a new one.",
+      });
+      return;
+    }
+
+    const table = ROLE_TABLE_MAP[resetRow.role];
+    const hashedNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    await pool.query(
+      `UPDATE ${table} SET password = $1, updated_at = NOW() WHERE email = $2`,
+      [hashedNewPassword, normalizedEmail],
+    );
+
+    await pool.query(
+      `UPDATE password_resets SET used_at = NOW() WHERE id = $1`,
+      [resetRow.id],
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "Password reset successfully." });
+  } catch (err) {
+    console.error("resetPasswordWithCode error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };
