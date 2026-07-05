@@ -10,12 +10,14 @@ import { useStudentListStore } from "./useStudentListStore";
 import { useFacilitatorListStore } from "./useFacilitatorListStore";
 import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
+import { ApiError } from "@/services/apiClient";
+import { useTicketStore } from "./useTicketStore";
 
 interface AdminStore {
   currentAdmin: Admin | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
   updateProfile: (data: Partial<Admin>) => Promise<boolean>;
@@ -48,29 +50,28 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
 
       const admin = await adminService.getById(payload.id);
       set({ currentAdmin: admin, isAuthenticated: true });
-    } catch {
-      await tokenStorage.clearAllTokens();
-      set({ currentAdmin: null, isAuthenticated: false });
+    } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 401) {
+        // Genuinely invalid/expired token — safe to log out.
+        await tokenStorage.clearAllTokens();
+        set({ currentAdmin: null, isAuthenticated: false });
+      }
     }
   },
 
   // ── Actions: login
-  login: async (email: string, password: string): Promise<boolean> => {
+  login: async (email: string, password: string): Promise<void> => {
     set({ isLoading: true });
     try {
       const admin = await adminService.login(email, password);
       set({ currentAdmin: admin, isAuthenticated: true });
 
       await useShopStore.getState().fetchItems();
-
       await useCenterStore.getState().fetchCenters();
       await useCourseStore.getState().fetchCourses();
       await useStudentListStore.getState().fetchStudents();
       await useFacilitatorListStore.getState().fetchFacilitators();
-
-      return true;
-    } catch (err: any) {
-      return false;
+      await useTicketStore.getState().fetchTickets();
     } finally {
       set({ isLoading: false });
     }

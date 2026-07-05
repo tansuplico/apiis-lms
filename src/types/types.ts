@@ -87,6 +87,7 @@ export type CoursePart = {
   quizQuestions?: QuizQuestion[];
   content?: string;
   order: number;
+  updatedAt?: string;
 };
 
 export type ModuleVideo = {

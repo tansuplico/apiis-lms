@@ -9,12 +9,13 @@ import { useCourseStore } from "./useCourseStore";
 import { useStudentListStore } from "./useStudentListStore";
 import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
+import { ApiError } from "@/services/apiClient";
 
 interface FacilitatorStore {
   currentFacilitator: Facilitator | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
   updatePasswordForced: (newPassword: string) => Promise<boolean>;
@@ -48,14 +49,17 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
 
       const facilitator = await facilitatorService.getById(payload.id);
       set({ currentFacilitator: facilitator, isAuthenticated: true });
-    } catch {
-      await tokenStorage.clearAllTokens();
-      set({ currentFacilitator: null, isAuthenticated: false });
+    } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 401) {
+        // Genuinely invalid/expired token — safe to log out.
+        await tokenStorage.clearAllTokens();
+        set({ currentFacilitator: null, isAuthenticated: false });
+      }
     }
   },
 
   // ── Actions: login
-  login: async (email, password) => {
+  login: async (email, password): Promise<void> => {
     set({ isLoading: true });
     try {
       const facilitator = await facilitatorService.login(email, password);
@@ -67,10 +71,6 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         await useCourseStore.getState().fetchCourses();
         await useStudentListStore.getState().fetchStudents();
       }
-
-      return true;
-    } catch (err: any) {
-      return false;
     } finally {
       set({ isLoading: false });
     }

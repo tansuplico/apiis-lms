@@ -32,8 +32,13 @@ export default function CourseModulePart() {
   }>();
 
   // ── Store
-  const { updatePart, updateQuizQuestions, deletePart, reorderPart } =
-    useCourseStore();
+  const {
+    updatePart,
+    updateQuizQuestions,
+    deletePart,
+    reorderPart,
+    refreshCourse,
+  } = useCourseStore();
 
   // ── Derived: current module + part
   const modNum = Number(moduleNumber?.replace("module-", "")) || 1;
@@ -119,19 +124,25 @@ export default function CourseModulePart() {
           currentModuleData.id,
           currentPartData.id,
           editedQuestions,
+          currentPartData.updatedAt,
         );
       } else {
         await updatePart(course.id, currentModuleData.id, currentPartData.id, {
           name: editedTitle,
           coverColor: editedColor,
           content: editedContent,
+          expectedUpdatedAt: currentPartData.updatedAt,
         });
       }
       toast.success("Changes saved!", {
         position: "bottom-right",
         autoClose: 2000,
       });
-    } catch {}
+    } catch (err: any) {
+      if (err?.statusCode === 409) {
+        await refreshCourse(course.id);
+      }
+    }
   };
 
   const handleReorder = async (direction: "up" | "down") => {
@@ -163,15 +174,10 @@ export default function CourseModulePart() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
-    // Convert to base64 so the image is embedded directly in the content HTML
-    // as <img src="data:image/...;base64,...">. This means it works offline
-    // and in production (no Vite proxy, no server fetch needed at display time).
-    // We still upload to the server for persistence, but TipTap uses the base64.
     const token = await tokenStorage.getToken();
     const formData = new FormData();
     formData.append("image", file);
 
-    // Fire-and-forget server upload for persistence — don't await or block on it
     fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},

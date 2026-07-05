@@ -48,7 +48,7 @@ interface CourseStore {
     courseId: number,
     moduleId: number,
     partId: number,
-    data: Partial<CoursePart>,
+    data: Partial<CoursePart> & { expectedUpdatedAt?: string }, // ← added intersection
   ) => Promise<void>;
   deletePart: (
     courseId: number,
@@ -60,7 +60,9 @@ interface CourseStore {
     moduleId: number,
     partId: number,
     questions: QuizQuestion[],
+    expectedUpdatedAt?: string, // ← added
   ) => Promise<void>;
+  refreshCourse: (courseId: number) => Promise<void>;
   reorderPart: (
     courseId: number,
     moduleId: number,
@@ -272,8 +274,14 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
   },
 
   updatePart: async (courseId, moduleId, partId, data) => {
+    const { expectedUpdatedAt, ...fields } = data; // ← added
     try {
-      await courseService.updatePart(courseId, moduleId, partId, data);
+      const { updatedAt } = await courseService.updatePart(
+        courseId,
+        moduleId,
+        partId,
+        data,
+      );
       set((state) => ({
         courses: state.courses.map((c) =>
           c.id === courseId
@@ -284,7 +292,13 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
                     ? {
                         ...m,
                         parts: m.parts.map((p) =>
-                          p.id === partId ? { ...p, ...data } : p,
+                          p.id === partId
+                            ? {
+                                ...p,
+                                ...fields,
+                                ...(updatedAt && { updatedAt }),
+                              }
+                            : p,
                         ),
                       }
                     : m,
@@ -326,13 +340,20 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
   },
 
   // ── Actions: quiz management
-  updateQuizQuestions: async (courseId, moduleId, partId, questions) => {
+  updateQuizQuestions: async (
+    courseId,
+    moduleId,
+    partId,
+    questions,
+    expectedUpdatedAt,
+  ) => {
     try {
-      await courseService.updateQuizQuestions(
+      const { updatedAt } = await courseService.updateQuizQuestions(
         courseId,
         moduleId,
         partId,
         questions,
+        expectedUpdatedAt,
       );
 
       set((state) => ({
@@ -346,7 +367,11 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
                         ...m,
                         parts: m.parts.map((p) =>
                           p.id === partId
-                            ? { ...p, quizQuestions: questions }
+                            ? {
+                                ...p,
+                                quizQuestions: questions,
+                                ...(updatedAt && { updatedAt }),
+                              }
                             : p,
                         ),
                       }
@@ -358,6 +383,18 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
       }));
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update quiz.");
+      throw err;
+    }
+  },
+
+  refreshCourse: async (courseId) => {
+    try {
+      const fresh = await courseService.getById(courseId);
+      set((state) => ({
+        courses: state.courses.map((c) => (c.id === courseId ? fresh : c)),
+      }));
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to refresh course.");
       throw err;
     }
   },

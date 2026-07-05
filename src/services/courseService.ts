@@ -87,12 +87,14 @@ export const courseService = {
       name?: string;
       coverColor?: string;
       content?: string;
+      expectedUpdatedAt?: string;
     },
-  ): Promise<void> => {
-    await apiClient.put(
+  ): Promise<{ updatedAt?: string }> => {
+    const response = await apiClient.put<{ updatedAt?: string }>(
       `/courses/${courseId}/modules/${moduleId}/parts/${partId}`,
       data,
     );
+    return response.data ?? {};
   },
 
   deletePart: async (
@@ -111,11 +113,13 @@ export const courseService = {
     moduleId: number,
     partId: number,
     questions: QuizQuestion[],
-  ): Promise<void> => {
-    await apiClient.put(
+    expectedUpdatedAt?: string,
+  ): Promise<{ updatedAt?: string }> => {
+    const response = await apiClient.put<{ updatedAt?: string }>(
       `/courses/${courseId}/modules/${moduleId}/parts/${partId}/quiz`,
-      { questions },
+      { questions, expectedUpdatedAt },
     );
+    return response.data ?? {};
   },
 
   reorderPart: async (

@@ -131,7 +131,7 @@ export const getAllCourses = async (req: Request, res: Response) => {
     const moduleIds = modulesResult.rows.map((m) => m.id);
 
     const partsResult = await pool.query(
-      `SELECT id, module_id, slug, name, cover_color, content, order_index
+      `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at
        FROM course_parts
        WHERE module_id = ANY($1)
        ORDER BY module_id, order_index ASC`,
@@ -192,6 +192,7 @@ export const getAllCourses = async (req: Request, res: Response) => {
                 coverColor: p.cover_color,
                 content: p.content,
                 order: p.order_index,
+                updatedAt: p.updated_at,
                 ...(quizQuestions.length > 0 && { quizQuestions }),
               };
             });
@@ -305,7 +306,7 @@ export const getCourse = async (req: Request, res: Response) => {
     let partsResult = { rows: [] as any[] };
     if (moduleIds.length > 0) {
       partsResult = await pool.query(
-        `SELECT id, module_id, slug, name, cover_color, content, order_index
+        `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at
          FROM course_parts WHERE module_id = ANY($1) ORDER BY order_index ASC`,
         [moduleIds],
       );
@@ -363,6 +364,7 @@ export const getCourse = async (req: Request, res: Response) => {
             coverColor: p.cover_color,
             content: p.content,
             order: p.order_index,
+            updatedAt: p.updated_at,
             ...(quizQuestions.length > 0 && { quizQuestions }),
           };
         });
@@ -1198,7 +1200,7 @@ export const updatePart = async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
     const { id, moduleId, partId } = req.params;
-    const { name, coverColor, content } = req.body;
+    const { name, coverColor, content, expectedUpdatedAt } = req.body;
 
     if (isNaN(Number(id)) || isNaN(Number(moduleId)) || isNaN(Number(partId))) {
       res.status(400).json({ success: false, message: "Invalid ID." });
@@ -1235,7 +1237,7 @@ export const updatePart = async (req: Request, res: Response) => {
     }
 
     const existing = await pool.query(
-      `SELECT p.id FROM course_parts p
+      `SELECT p.id, p.updated_at FROM course_parts p
        INNER JOIN course_modules m ON m.id = p.module_id
        WHERE p.id = $1 AND m.id = $2 AND m.course_id = $3`,
       [partId, moduleId, id],
@@ -1244,6 +1246,20 @@ export const updatePart = async (req: Request, res: Response) => {
     if (existing.rows.length === 0) {
       res.status(404).json({ success: false, message: "Part not found." });
       return;
+    }
+
+    // ── Conflict check: reject if this part was edited by someone else
+    if (expectedUpdatedAt) {
+      const currentUpdatedAt = new Date(existing.rows[0].updated_at).getTime();
+      const clientExpectedAt = new Date(expectedUpdatedAt).getTime();
+      if (currentUpdatedAt !== clientExpectedAt) {
+        res.status(409).json({
+          success: false,
+          message:
+            "This part was updated by someone else since you started editing. Please reload to see the latest version before saving.",
+        });
+        return;
+      }
     }
 
     if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
@@ -1271,14 +1287,16 @@ export const updatePart = async (req: Request, res: Response) => {
     }
 
     values.push(partId);
-    await pool.query(
-      `UPDATE course_parts SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramCount}`,
+    const updated = await pool.query(
+      `UPDATE course_parts SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramCount} RETURNING updated_at`,
       values,
     );
 
-    res
-      .status(200)
-      .json({ success: true, message: "Part updated successfully." });
+    res.status(200).json({
+      success: true,
+      message: "Part updated successfully.",
+      data: { updatedAt: updated.rows[0].updated_at },
+    });
   } catch (err) {
     console.error("updatePart error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
@@ -1349,7 +1367,7 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
     const { id, moduleId, partId } = req.params;
-    const { questions } = req.body;
+    const { questions, expectedUpdatedAt } = req.body;
 
     if (isNaN(Number(id)) || isNaN(Number(moduleId)) || isNaN(Number(partId))) {
       res.status(400).json({ success: false, message: "Invalid ID." });
@@ -1446,7 +1464,7 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
     }
 
     const existing = await pool.query(
-      `SELECT p.id FROM course_parts p
+      `SELECT p.id, p.updated_at FROM course_parts p
        INNER JOIN course_modules m ON m.id = p.module_id
        WHERE p.id = $1 AND m.id = $2 AND m.course_id = $3`,
       [partId, moduleId, id],
@@ -1455,6 +1473,20 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
     if (existing.rows.length === 0) {
       res.status(404).json({ success: false, message: "Part not found." });
       return;
+    }
+
+    // ── Conflict check: same version clock as updatePart (course_parts.updated_at),
+    if (expectedUpdatedAt) {
+      const currentUpdatedAt = new Date(existing.rows[0].updated_at).getTime();
+      const clientExpectedAt = new Date(expectedUpdatedAt).getTime();
+      if (currentUpdatedAt !== clientExpectedAt) {
+        res.status(409).json({
+          success: false,
+          message:
+            "This quiz was updated by someone else since you started editing. Please reload to see the latest version before saving.",
+        });
+        return;
+      }
     }
 
     if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
@@ -1489,11 +1521,20 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
           ],
         );
       }
+
+      // Bump the part's updated_at so it stays the single version clock
+      // shared between content edits and quiz edits on this part.
+      const bumped = await client.query(
+        `UPDATE course_parts SET updated_at = NOW() WHERE id = $1 RETURNING updated_at`,
+        [partId],
+      );
+
       await client.query("COMMIT");
 
       res.status(200).json({
         success: true,
         message: "Quiz questions updated successfully.",
+        data: { updatedAt: bumped.rows[0].updated_at },
       });
     } catch (err) {
       await client.query("ROLLBACK");

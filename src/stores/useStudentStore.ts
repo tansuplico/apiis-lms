@@ -20,6 +20,7 @@ import {
   syncPendingProgress,
 } from "@/services/offlineProgressService";
 import { navigateTo } from "@/services/navigationService";
+import { ApiError } from "@/services/apiClient";
 
 interface StudentStore {
   currentStudent: Student | null;
@@ -107,7 +108,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         }
         return { coursesFetched: false };
       }
-    } catch {
+    } catch (err) {
       if (!isOnline()) {
         const localStudent = await loadLocalSession();
         if (localStudent) {
@@ -115,9 +116,19 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         }
         return { coursesFetched: false };
       }
-      await tokenStorage.clearAllTokens();
-      await clearLocalSession();
-      set({ currentStudent: null, isAuthenticated: false });
+
+      // Genuinely invalid/expired token — safe to fully log out.
+      if (err instanceof ApiError && err.statusCode === 401) {
+        await tokenStorage.clearAllTokens();
+        await clearLocalSession();
+        set({ currentStudent: null, isAuthenticated: false });
+        return { coursesFetched: false };
+      }
+
+      const localStudent = await loadLocalSession();
+      if (localStudent) {
+        set({ currentStudent: localStudent, isAuthenticated: true });
+      }
       return { coursesFetched: false };
     }
   },

@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import morgan from "morgan";
 
 import { errorHandler } from "./middleware/errorHandler";
@@ -26,6 +26,8 @@ import courseImageRoutes from "./routes/courseImage";
 
 import swaggerUi from "swagger-ui-express";
 
+import jwt from "jsonwebtoken";
+
 // ── Config
 dotenv.config();
 
@@ -38,6 +40,7 @@ for (const envVar of requiredEnvVars) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV === "development";
 
@@ -97,10 +100,27 @@ const authLimiter = rateLimit({
   },
 });
 
+const userOrIpKeyGenerator = (req: express.Request): string => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+        id: number;
+      };
+      if (decoded?.id) return `user:${decoded.id}`;
+    } catch {
+      // invalid/expired token — fall through to IP-based limiting below
+    }
+  }
+  return ipKeyGenerator(req.ip as string);
+};
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isDev ? 5000 : 500,
   skip: () => isDev,
+  keyGenerator: userOrIpKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

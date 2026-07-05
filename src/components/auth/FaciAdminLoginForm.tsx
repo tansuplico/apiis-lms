@@ -1,4 +1,5 @@
 // src/components/auth/FaciAdminLoginForm.tsx
+import { ApiError } from "@/services/apiClient";
 import { useAdminStore } from "@/stores/useAdminStore";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
 import { useEffect, useState } from "react";
@@ -43,12 +44,8 @@ export default function FaciAdminLoginForm() {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    const facilitatorSuccess = await facilitatorLogin(
-      trimmedEmail,
-      trimmedPassword,
-    );
-
-    if (facilitatorSuccess) {
+    try {
+      await facilitatorLogin(trimmedEmail, trimmedPassword);
       const facilitator = useFacilitatorStore.getState().currentFacilitator;
       if (facilitator?.mustChangePassword) {
         navigate("/facilitator/change-password");
@@ -56,14 +53,30 @@ export default function FaciAdminLoginForm() {
       }
       navigate("/facilitator/dashboard");
       return;
+    } catch (facilitatorErr: any) {
+      if (
+        !(facilitatorErr instanceof ApiError) ||
+        facilitatorErr.statusCode !== 401
+      ) {
+        toast.error(
+          facilitatorErr.message ?? "Something went wrong. Please try again.",
+        );
+        return;
+      }
     }
 
-    const adminSuccess = await adminLogin(trimmedEmail, trimmedPassword);
-    if (adminSuccess) {
+    try {
+      await adminLogin(trimmedEmail, trimmedPassword);
       navigate("/admin/dashboard");
-      return;
+    } catch (adminErr: any) {
+      if (adminErr instanceof ApiError && adminErr.statusCode === 401) {
+        toast.error("Invalid email or password.");
+      } else {
+        toast.error(
+          adminErr.message ?? "Something went wrong. Please try again.",
+        );
+      }
     }
-    toast.error("Invalid email or password.");
   };
 
   // ── Handlers: forgot password

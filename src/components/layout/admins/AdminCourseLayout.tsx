@@ -42,6 +42,7 @@ export default function AdminCourseLayout() {
     deleteVideo: storeDeleteVideo,
     uploadFile: storeUploadFile,
     deleteFile: storeDeleteFile,
+    refreshCourse,
   } = useCourseStore();
 
   const {
@@ -357,6 +358,13 @@ export default function AdminCourseLayout() {
     } catch {}
   };
 
+  const handleEnterEditMode = async () => {
+    try {
+      await refreshCourse(course.id);
+    } catch {}
+    setIsEditMode(true);
+  };
+
   // ── Render
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -374,7 +382,7 @@ export default function AdminCourseLayout() {
           </h2>
           {!isEditMode ? (
             <button
-              onClick={() => setIsEditMode(true)}
+              onClick={handleEnterEditMode}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all cursor-pointer"
             >
               <Pencil size={14} />
