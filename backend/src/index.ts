@@ -23,6 +23,8 @@ import centerThumbnailRoutes from "./routes/centerThumbnail";
 import fileRoutes from "./routes/files";
 import submissionRoutes from "./routes/submission";
 import courseImageRoutes from "./routes/courseImage";
+import questionBankRoutes from "./routes/questionBank";
+import quizBankCollectionRoutes from "./routes/quizBankCollection";
 
 import swaggerUi from "swagger-ui-express";
 
@@ -163,6 +165,9 @@ app.use("/api/center-thumbnails", apiLimiter, centerThumbnailRoutes);
 app.use("/api/files", apiLimiter, fileRoutes);
 app.use("/api/submissions", apiLimiter, submissionRoutes);
 app.use("/api/content-images", courseImageRoutes);
+app.use("/api/question-bank", apiLimiter, questionBankRoutes);
+app.use("/api/quiz-bank-collections", apiLimiter, quizBankCollectionRoutes);
+
 // ── Swagger (development only)
 if (isDev) {
   const swaggerSpec = {

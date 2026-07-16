@@ -7,9 +7,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
+  History,
+  X,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { Student } from "@/types/types";
+import { AccountStatus, Student } from "@/types/types";
 import { useCenterStore } from "@/stores/useCenterStore";
 import { useStudentListStore } from "@/stores/useStudentListStore";
 import { useStudentStore } from "@/stores/useStudentStore";
@@ -62,6 +67,31 @@ export default function Students() {
   // ── Derived: search & pagination
   const debouncedSearch = useDebounce(searchTerm, 300);
 
+  // ── Sort & filter
+  type SortKey = "name" | "idNumber" | "status" | "center";
+  const [sortBy, setSortBy] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [statusFilter, setStatusFilter] = useState<AccountStatus | "all">(
+    "all",
+  );
+  const [centerFilter, setCenterFilter] = useState<string>("all");
+
+  // ── Modal: transfer history
+  const [studentForHistory, setStudentForHistory] = useState<Student | null>(
+    null,
+  );
+  const [historyLogs, setHistoryLogs] = useState<
+    {
+      id: number;
+      action: "added" | "removed";
+      centerTitle: string;
+      performedByName: string;
+      performedByRole: string;
+      createdAt: string;
+    }[]
+  >([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
   const centerTitleMap = useMemo(() => {
     const map = new Map<number, string>();
     centers.forEach((c) => map.set(c.id, c.title));
@@ -69,20 +99,71 @@ export default function Students() {
   }, [centers]);
 
   const filteredStudents = useMemo(() => {
-    if (!debouncedSearch.trim()) return students;
-    const lower = debouncedSearch.toLowerCase().trim();
-    return students.filter((s) => {
-      const fullName =
-        `${s.firstName} ${s.middleName ?? ""} ${s.lastName}`.toLowerCase();
-      const assignedTitle = centerTitleMap.get(s.currentCenter ?? -1) ?? "";
-      return (
-        fullName.includes(lower) ||
-        s.idNumber.toLowerCase().includes(lower) ||
-        s.status.toLowerCase().includes(lower) ||
-        assignedTitle.toLowerCase().includes(lower)
+    let result = students;
+
+    if (debouncedSearch.trim()) {
+      const lower = debouncedSearch.toLowerCase().trim();
+      result = result.filter((s) => {
+        const fullName =
+          `${s.firstName} ${s.middleName ?? ""} ${s.lastName}`.toLowerCase();
+        const assignedTitle = centerTitleMap.get(s.currentCenter ?? -1) ?? "";
+        return (
+          fullName.includes(lower) ||
+          s.idNumber.toLowerCase().includes(lower) ||
+          s.status.toLowerCase().includes(lower) ||
+          assignedTitle.toLowerCase().includes(lower)
+        );
+      });
+    }
+
+    if (statusFilter !== "all") {
+      result = result.filter((s) => s.status === statusFilter);
+    }
+
+    if (centerFilter !== "all") {
+      result = result.filter((s) =>
+        centerFilter === "unassigned"
+          ? s.currentCenter === null
+          : s.currentCenter === Number(centerFilter),
       );
-    });
-  }, [debouncedSearch, students, centerTitleMap]);
+    }
+
+    if (sortBy) {
+      result = [...result].sort((a, b) => {
+        let cmp = 0;
+        switch (sortBy) {
+          case "name":
+            cmp = `${a.firstName} ${a.lastName}`.localeCompare(
+              `${b.firstName} ${b.lastName}`,
+            );
+            break;
+          case "idNumber":
+            cmp = a.idNumber.localeCompare(b.idNumber);
+            break;
+          case "status":
+            cmp = a.status.localeCompare(b.status);
+            break;
+          case "center": {
+            const titleA = centerTitleMap.get(a.currentCenter ?? -1) ?? "";
+            const titleB = centerTitleMap.get(b.currentCenter ?? -1) ?? "";
+            cmp = titleA.localeCompare(titleB);
+            break;
+          }
+        }
+        return sortDirection === "asc" ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [
+    debouncedSearch,
+    students,
+    centerTitleMap,
+    statusFilter,
+    centerFilter,
+    sortBy,
+    sortDirection,
+  ]);
 
   const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -91,9 +172,9 @@ export default function Students() {
     startIndex + ITEMS_PER_PAGE,
   );
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
+useEffect(() => {
+  setCurrentPage(1);
+}, [debouncedSearch, statusFilter, centerFilter]);
 
   // ── Handlers: pagination
   const goToPage = (page: number) => {
@@ -128,6 +209,80 @@ export default function Students() {
     }
   };
 
+  const groupedHistoryLogs = useMemo(() => {
+    const groups = new Map<string, typeof historyLogs>();
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    historyLogs.forEach((log) => {
+      const d = new Date(log.createdAt);
+      const label =
+        d.toDateString() === today.toDateString()
+          ? "Today"
+          : d.toDateString() === yesterday.toDateString()
+            ? "Yesterday"
+            : d.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year:
+                  d.getFullYear() !== today.getFullYear()
+                    ? "numeric"
+                    : undefined,
+              });
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(log);
+    });
+
+    return Array.from(groups.entries());
+  }, [historyLogs]);
+
+  // ── Handlers: sorting
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortBy !== column)
+      return <ArrowUpDown size={14} className="opacity-40" />;
+    return sortDirection === "asc" ? (
+      <ChevronUp size={14} />
+    ) : (
+      <ChevronDown size={14} />
+    );
+  };
+
+  // ── Handlers: view transfer history
+  const handleViewHistory = async (student: Student) => {
+    setStudentForHistory(student);
+    setIsLoadingHistory(true);
+
+    try {
+      const response = await apiClient.get<
+        {
+          id: number;
+          action: "added" | "removed";
+          centerTitle: string;
+          performedByName: string;
+          performedByRole: string;
+          createdAt: string;
+        }[]
+      >(`/students/${student.id}/center-logs`);
+
+      setHistoryLogs(response.data ?? []);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to load transfer history.");
+      setHistoryLogs([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   // ── Handlers: reset password
   const handleResetPassword = async (student: Student) => {
     setIsResetting(true);
@@ -154,54 +309,84 @@ export default function Students() {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
+      <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+        All Students
+      </h1>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
-          All Students
-        </h1>
+        <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex gap-5">
+            <div className="w-full sm:w-80 flex items-center  gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+              <Search size={20} className="text-gray-500 dark:text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+              />
+            </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="w-full sm:w-80 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
-            <Search size={20} className="text-gray-500 dark:text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-            />
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as AccountStatus | "all")
+              }
+              className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="banned">Banned</option>
+            </select>
+
+            <select
+              value={centerFilter}
+              onChange={(e) => setCenterFilter(e.target.value)}
+              className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+            >
+              <option value="all">All centers</option>
+              <option value="unassigned">Not assigned</option>
+              {centers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            disabled={!online}
-            title={
-              !online ? "You're offline — connect to make changes" : undefined
-            }
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap shrink-0 ${
-              online
-                ? "bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white cursor-pointer shadow-md hover:shadow-lg"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            <Plus size={20} />
-            New Student
-          </button>
+          <div className="flex gap-5">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              disabled={!online}
+              title={
+                !online ? "You're offline — connect to make changes" : undefined
+              }
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap shrink-0 ${
+                online
+                  ? "bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white cursor-pointer shadow-md hover:shadow-lg"
+                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <Plus size={20} />
+              New Student
+            </button>
 
-          <button
-            onClick={() => setShowImportModal(true)}
-            disabled={!online}
-            title={
-              !online ? "You're offline — connect to make changes" : undefined
-            }
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap shrink-0 ${
-              online
-                ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-md"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            <Plus size={20} />
-            Import CSV
-          </button>
+            <button
+              onClick={() => setShowImportModal(true)}
+              disabled={!online}
+              title={
+                !online ? "You're offline — connect to make changes" : undefined
+              }
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap shrink-0 ${
+                online
+                  ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-md"
+                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <Plus size={20} />
+              Import CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -215,21 +400,45 @@ export default function Students() {
                   Student
                 </th>
                 <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Name
+                  <button
+                    onClick={() => handleSort("name")}
+                    className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                  >
+                    Name
+                    <SortIcon column="name" />
+                  </button>
                 </th>
                 <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Current Center
+                  <button
+                    onClick={() => handleSort("center")}
+                    className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                  >
+                    Current Center
+                    <SortIcon column="center" />
+                  </button>
                 </th>
                 <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  ID Number
+                  <button
+                    onClick={() => handleSort("idNumber")}
+                    className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                  >
+                    ID Number
+                    <SortIcon column="idNumber" />
+                  </button>
                 </th>
                 <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
                   Password
                 </th>
                 <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Status
+                  <button
+                    onClick={() => handleSort("status")}
+                    className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                  >
+                    Status
+                    <SortIcon column="status" />
+                  </button>
                 </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 text-right">
+                <th className="px-6 py-4 text-sm font-semibold  text-gray-700 dark:text-gray-300 text-center">
                   Actions
                 </th>
               </tr>
@@ -303,6 +512,13 @@ export default function Students() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right flex gap-3 justify-end">
+                          <button
+                            onClick={() => handleViewHistory(student)}
+                            title="View transfer history"
+                            className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <History size={18} />
+                          </button>
                           <button
                             onClick={() => handleEdit(student)}
                             disabled={!online}
@@ -453,6 +669,97 @@ export default function Students() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {studentForHistory && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+          <div className="w-[440px] h-[580px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
+            {/* Header — pinned */}
+            <div className="shrink-0 flex items-start justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  Center history
+                </p>
+                <h3 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-white">
+                  {studentForHistory.firstName} {studentForHistory.lastName}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setStudentForHistory(null);
+                  setHistoryLogs([]);
+                }}
+                className="p-1.5 -mr-1.5 -mt-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body — independently scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {isLoadingHistory ? (
+                <div className="h-full flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+                  Loading history…
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                  <History
+                    size={28}
+                    className="text-gray-300 dark:text-gray-700"
+                  />
+                  <p className="text-sm text-gray-400 dark:text-gray-500 max-w-[220px]">
+                    No center changes yet. Assignments and transfers will show
+                    up here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {groupedHistoryLogs.map(([dateLabel, entries]) => (
+                    <div key={dateLabel}>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+                        {dateLabel}
+                      </p>
+                      <ul className="relative border-l border-gray-200 dark:border-gray-700 ml-1.5">
+                        {entries.map((log) => (
+                          <li
+                            key={log.id}
+                            className="relative pl-5 pb-5 last:pb-0"
+                          >
+                            <span
+                              className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-gray-900 ${
+                                log.action === "added"
+                                  ? "bg-green-500"
+                                  : "bg-rose-500"
+                              }`}
+                            />
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {log.performedByName}
+                              </span>{" "}
+                              {log.action === "added"
+                                ? "assigned to"
+                                : "removed from"}{" "}
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {log.centerTitle}
+                              </span>
+                            </p>
+                            <p className="mt-0.5 text-xs tabular-nums text-gray-400 dark:text-gray-500">
+                              {new Date(log.createdAt).toLocaleTimeString(
+                                undefined,
+                                { hour: "numeric", minute: "2-digit" },
+                              )}{" "}
+                              · {log.performedByRole}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

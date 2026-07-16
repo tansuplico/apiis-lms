@@ -7,6 +7,64 @@ import { AuthRequest } from "../middleware/auth";
 const SLUG_REGEX = /^[a-z0-9-]+$/;
 const MAX_ANSWERS_COUNT = 50; // ← match MAX_QUIZ_QUESTIONS from courseController
 
+// ── Quiz grading (shared by saveQuizAnswers and the gradebook batch query below —
+// keep both call sites in sync when adding a new question type)
+function isAnswerCorrect(qd: any, studentAns: unknown): boolean {
+  const type = qd.type ?? "multiple_choice";
+
+  switch (type) {
+    case "multiple_choice":
+      return studentAns === qd.correctOptionIndex;
+
+    case "true_false": {
+      if (typeof studentAns === "undefined") return false;
+      const normalized =
+        typeof studentAns === "string"
+          ? studentAns.trim().toLowerCase() === "true"
+          : Boolean(studentAns);
+      return normalized === qd.correctBoolean;
+    }
+
+    case "identification": {
+      if (typeof studentAns !== "string") return false;
+      // Backward-compatible: old rows may still only have a single `correctAnswer`.
+      const accepted: string[] = Array.isArray(qd.correctAnswers)
+        ? qd.correctAnswers
+        : qd.correctAnswer
+          ? [qd.correctAnswer]
+          : [];
+      const normalizedAns = studentAns.trim().toLowerCase();
+      return accepted.some(
+        (a) =>
+          typeof a === "string" && a.trim().toLowerCase() === normalizedAns,
+      );
+    }
+
+    case "matching": {
+      if (!Array.isArray(studentAns) || !Array.isArray(qd.matchingPairs)) {
+        return false;
+      }
+      if (studentAns.length !== qd.matchingPairs.length) return false;
+      // All-or-nothing per question, consistent with every other question type
+      // here being graded as a single correct/incorrect unit (no partial credit).
+      return qd.matchingPairs.every(
+        (pair: { left: string; right: string }, i: number) =>
+          typeof studentAns[i] === "string" &&
+          (studentAns[i] as string).trim().toLowerCase() ===
+            pair.right.trim().toLowerCase(),
+      );
+    }
+
+    case "fill_in_the_blank":
+    default:
+      return (
+        typeof studentAns === "string" &&
+        studentAns.trim().toLowerCase() ===
+          qd.correctAnswer?.trim().toLowerCase()
+      );
+  }
+}
+
 // ── Get Student Progress
 export const getStudentProgress = async (req: AuthRequest, res: Response) => {
   try {
@@ -446,19 +504,8 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
 
       questions.forEach((q, index) => {
         const qd = q.question_data;
-        const type = qd.type ?? "multiple_choice";
         const studentAns = answers[String(index)];
-
-        if (type === "multiple_choice") {
-          if (studentAns === qd.correctOptionIndex) correct++;
-        } else {
-          if (
-            typeof studentAns === "string" &&
-            studentAns.trim().toLowerCase() ===
-              qd.correctAnswer?.trim().toLowerCase()
-          )
-            correct++;
-        }
+        if (isAnswerCorrect(qd, studentAns)) correct++;
       });
 
       coinsToAward =
@@ -800,19 +847,8 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
 
       questions.forEach((q, index) => {
         const qd = q.question_data;
-        const type = qd.type ?? "multiple_choice";
         const studentAns = studentAnswers[String(index)];
-
-        if (type === "multiple_choice") {
-          if (studentAns === qd.correctOptionIndex) correct++;
-        } else {
-          if (
-            typeof studentAns === "string" &&
-            studentAns.trim().toLowerCase() ===
-              qd.correctAnswer?.trim().toLowerCase()
-          )
-            correct++;
-        }
+        if (isAnswerCorrect(qd, studentAns)) correct++;
       });
 
       const score = Math.round((correct / numQuestions) * 100);

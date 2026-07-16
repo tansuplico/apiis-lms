@@ -1,6 +1,6 @@
 // src/pages/students/CourseQuiz.tsx
 import { useOutletContext } from "react-router-dom";
-import { Course, QuizQuestionType } from "@/types/types";
+import { Course, QuizQuestion, QuizQuestionType } from "@/types/types";
 import { useState } from "react";
 import {
   CheckCircle,
@@ -27,7 +27,60 @@ const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
   identification: "Identification",
   fill_in_the_blank: "Fill in the Blank",
+  true_false: "True / False",
+  matching: "Matching",
 };
+
+type StudentAnswer = number | string | boolean | string[] | undefined;
+
+// Shared grading logic for every question type — used for restoring a
+// previously-submitted score, live per-question feedback, and the final
+// submit tally, so all three stay in sync (mirrors the backend's
+// isAnswerCorrect in progressController.ts; keep both in sync when adding
+// a new question type).
+function isQuestionCorrect(q: QuizQuestion, answer: StudentAnswer): boolean {
+  const type = q.type ?? "multiple_choice";
+
+  switch (type) {
+    case "multiple_choice":
+      return answer === q.correctOptionIndex;
+
+    case "true_false": {
+      if (typeof answer === "undefined") return false;
+      const normalized =
+        typeof answer === "string"
+          ? answer.trim().toLowerCase() === "true"
+          : Boolean(answer);
+      return normalized === q.correctBoolean;
+    }
+
+    case "identification": {
+      if (typeof answer !== "string") return false;
+      const accepted =
+        q.correctAnswers ?? (q.correctAnswer ? [q.correctAnswer] : []);
+      const given = answer.trim().toLowerCase();
+      return accepted.some((a) => a.trim().toLowerCase() === given);
+    }
+
+    case "matching": {
+      if (!Array.isArray(answer) || !q.matchingPairs) return false;
+      if (answer.length !== q.matchingPairs.length) return false;
+      return q.matchingPairs.every(
+        (pair, i) =>
+          typeof answer[i] === "string" &&
+          (answer[i] as string).trim().toLowerCase() ===
+            pair.right.trim().toLowerCase(),
+      );
+    }
+
+    case "fill_in_the_blank":
+    default:
+      return (
+        typeof answer === "string" &&
+        answer.trim().toLowerCase() === q.correctAnswer?.trim().toLowerCase()
+      );
+  }
+}
 
 export default function CourseQuiz() {
   // ── Store & hooks
@@ -56,18 +109,9 @@ export default function CourseQuiz() {
   const savedAnswers =
     currentStudent?.courseProgress[course.id]?.quizAnswers?.[modNum] ?? {};
 
-  const restoredScore = questions.filter((q, idx) => {
-    const saved = savedAnswers[idx];
-    const type = q.type ?? "multiple_choice";
-    if (type === "multiple_choice") {
-      return saved === q.correctOptionIndex;
-    }
-    return (
-      String(saved ?? "")
-        .trim()
-        .toLowerCase() === q.correctAnswer?.trim().toLowerCase()
-    );
-  }).length;
+  const restoredScore = questions.filter((q, idx) =>
+    isQuestionCorrect(q, savedAnswers[idx] as StudentAnswer),
+  ).length;
 
   const restoredCoins = (() => {
     if (!alreadyCompletedQuiz || questions.length === 0) return 0;
@@ -78,7 +122,7 @@ export default function CourseQuiz() {
   // ── State
   const [marked, setMarked] = useState(false);
   const [studentAnswers, setStudentAnswers] = useState<
-    Record<number, number | string>
+    Record<number, number | string | boolean | string[]>
   >(alreadyCompletedQuiz ? savedAnswers : {});
   const [submitted, setSubmitted] = useState(alreadyCompletedQuiz);
   const [score, setScore] = useState(alreadyCompletedQuiz ? restoredScore : 0);
@@ -87,7 +131,20 @@ export default function CourseQuiz() {
   );
   const [alreadyClaimed, setAlreadyClaimed] = useState(alreadyCompletedQuiz);
 
-  const allAnswered = Object.keys(studentAnswers).length === questions.length;
+  const allAnswered =
+    questions.length > 0 &&
+    questions.every((q, idx) => {
+      const answer = studentAnswers[idx];
+      if (q.type === "matching") {
+        return (
+          Array.isArray(answer) &&
+          (q.matchingPairs ?? []).length > 0 &&
+          answer.length === (q.matchingPairs ?? []).length &&
+          answer.every((a) => typeof a === "string" && a.trim() !== "")
+        );
+      }
+      return typeof answer !== "undefined" && answer !== "";
+    });
   const percentage =
     questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
@@ -101,40 +158,24 @@ export default function CourseQuiz() {
   }
 
   // ── Handlers
-  const isCorrectAnswer = (qIndex: number, type: QuizQuestionType) => {
+  const isCorrectAnswer = (qIndex: number) => {
     const q = questions[qIndex];
     if (!q) return false;
-    const answer = studentAnswers[qIndex];
-    if (type === "multiple_choice") return answer === q.correctOptionIndex;
-    return (
-      String(answer ?? "")
-        .trim()
-        .toLowerCase() === q.correctAnswer?.trim().toLowerCase()
-    );
+    return isQuestionCorrect(q, studentAnswers[qIndex]);
   };
 
   const handleAnswerSelect = (
     questionIndex: number,
-    value: number | string,
+    value: number | string | boolean | string[],
   ) => {
     if (submitted) return;
     setStudentAnswers((prev) => ({ ...prev, [questionIndex]: value }));
   };
 
   const handleSubmit = async () => {
-    let correctCount = 0;
-    questions.forEach((q, idx) => {
-      const type = q.type ?? "multiple_choice";
-      if (type === "multiple_choice") {
-        if (studentAnswers[idx] === q.correctOptionIndex) correctCount++;
-      } else {
-        const correct = q.correctAnswer?.trim().toLowerCase();
-        const given = String(studentAnswers[idx] ?? "")
-          .trim()
-          .toLowerCase();
-        if (correct && given === correct) correctCount++;
-      }
-    });
+    const correctCount = questions.filter((q, idx) =>
+      isQuestionCorrect(q, studentAnswers[idx]),
+    ).length;
 
     const coins = COIN_REWARDS_BY_DIFFICULTY[course.level] ?? 5;
     const earned = Math.round((correctCount / questions.length) * coins);
@@ -204,7 +245,7 @@ export default function CourseQuiz() {
             {questions.map((q, idx) => {
               const type = q.type ?? "multiple_choice";
               const studentAnswer = studentAnswers[idx];
-              const correct = isCorrectAnswer(idx, type);
+              const correct = isCorrectAnswer(idx);
 
               return (
                 <div key={q.id}>
@@ -215,7 +256,11 @@ export default function CourseQuiz() {
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                         : type === "identification"
                           ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                          : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                          : type === "true_false"
+                            ? "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
+                            : type === "matching"
+                              ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300"
+                              : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                     }`}
                   >
                     {QUESTION_TYPE_LABELS[type]}
@@ -225,6 +270,14 @@ export default function CourseQuiz() {
                     {idx + 1}.{" "}
                     {type !== "fill_in_the_blank" ? q.question : null}
                   </p>
+
+                  {q.imageUrl && (
+                    <img
+                      src={q.imageUrl}
+                      alt="Question"
+                      className="max-h-64 rounded-lg border border-gray-200 dark:border-gray-700 mb-3"
+                    />
+                  )}
 
                   {/* Multiple Choice */}
                   {type === "multiple_choice" && (
@@ -309,7 +362,140 @@ export default function CourseQuiz() {
                         >
                           {correct
                             ? "✓ Correct!"
-                            : `✗ Correct answer: ${q.correctAnswer}`}
+                            : `✗ Correct answer: ${(q.correctAnswers ?? [q.correctAnswer]).filter(Boolean).join(" / ")}`}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* True / False */}
+                  {type === "true_false" && (
+                    <ul className="space-y-2">
+                      {[true, false].map((val) => {
+                        const isSelected = studentAnswer === val;
+                        const isCorrectOption = val === q.correctBoolean;
+
+                        let optionStyle =
+                          "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
+                        if (submitted) {
+                          if (isCorrectOption)
+                            optionStyle =
+                              "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
+                          else if (isSelected && !isCorrectOption)
+                            optionStyle =
+                              "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
+                        } else if (isSelected) {
+                          optionStyle =
+                            "border-blue-500 bg-blue-50 dark:bg-blue-900/30";
+                        }
+
+                        return (
+                          <li
+                            key={String(val)}
+                            onClick={() => handleAnswerSelect(idx, val)}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${optionStyle} ${
+                              !submitted
+                                ? "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`q${idx}`}
+                              checked={isSelected}
+                              onChange={() => handleAnswerSelect(idx, val)}
+                              className="text-blue-600 dark:text-blue-400 focus:ring-blue-500"
+                              disabled={submitted}
+                            />
+                            <span className="flex-1 text-sm">
+                              {val ? "True" : "False"}
+                            </span>
+                            {submitted && isCorrectOption && (
+                              <CheckCircle
+                                size={18}
+                                className="text-green-500 shrink-0"
+                              />
+                            )}
+                            {submitted && isSelected && !isCorrectOption && (
+                              <XCircle
+                                size={18}
+                                className="text-red-500 shrink-0"
+                              />
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  {/* Matching */}
+                  {type === "matching" && (
+                    <div className="space-y-2">
+                      {(q.matchingPairs ?? []).map((pair, pairIdx) => {
+                        const answerArr =
+                          (studentAnswer as string[] | undefined) ?? [];
+                        const given = answerArr[pairIdx] ?? "";
+                        const pairCorrect =
+                          submitted &&
+                          given.trim().toLowerCase() ===
+                            pair.right.trim().toLowerCase();
+                        return (
+                          <div
+                            key={pairIdx}
+                            className="flex items-center gap-3"
+                          >
+                            <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                              {pair.left}
+                            </span>
+                            <ArrowRight
+                              size={14}
+                              className="text-gray-400 shrink-0"
+                            />
+                            <select
+                              value={given}
+                              disabled={submitted}
+                              onChange={(e) => {
+                                const next = [...answerArr];
+                                next[pairIdx] = e.target.value;
+                                handleAnswerSelect(idx, next);
+                              }}
+                              className={`flex-1 p-2 border rounded-lg dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                submitted
+                                  ? pairCorrect
+                                    ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                                    : "border-red-500 bg-red-50 dark:bg-red-900/20"
+                                  : "border-gray-300 dark:border-gray-600"
+                              }`}
+                            >
+                              <option value="">Select a match...</option>
+                              {(q.matchingPairs ?? []).map((p, i) => (
+                                <option key={i} value={p.right}>
+                                  {p.right}
+                                </option>
+                              ))}
+                            </select>
+                            {submitted &&
+                              (pairCorrect ? (
+                                <CheckCircle
+                                  size={18}
+                                  className="text-green-500 shrink-0"
+                                />
+                              ) : (
+                                <XCircle
+                                  size={18}
+                                  className="text-red-500 shrink-0"
+                                />
+                              ))}
+                          </div>
+                        );
+                      })}
+                      {submitted && (
+                        <p
+                          className={`text-sm font-medium ${correct ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+                        >
+                          {correct
+                            ? "✓ All pairs correct!"
+                            : "✗ One or more pairs were incorrect."}
                         </p>
                       )}
                     </div>
@@ -367,14 +553,15 @@ export default function CourseQuiz() {
                     </div>
                   )}
 
-                  {/* correct/incorrect label for MC */}
-                  {submitted && type === "multiple_choice" && (
-                    <p
-                      className={`text-sm font-medium mt-2 ${correct ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
-                    >
-                      {correct ? "✓ Correct" : "✗ Incorrect"}
-                    </p>
-                  )}
+                  {/* correct/incorrect label for MC and True/False */}
+                  {submitted &&
+                    (type === "multiple_choice" || type === "true_false") && (
+                      <p
+                        className={`text-sm font-medium mt-2 ${correct ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+                      >
+                        {correct ? "✓ Correct" : "✗ Incorrect"}
+                      </p>
+                    )}
                 </div>
               );
             })}

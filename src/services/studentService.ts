@@ -139,7 +139,7 @@ export const studentService = {
   saveQuizAnswers: async (
     courseId: number,
     moduleNumber: number,
-    answers: Record<string, number | string>,
+    answers: Record<string, number | string | boolean | string[]>,
   ): Promise<{ coinsAwarded: number; alreadyClaimed: boolean }> => {
     const response = await apiClient.post<{
       coinsAwarded: number;

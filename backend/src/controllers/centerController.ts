@@ -630,7 +630,7 @@ export const unassignFacilitatorFromCenter = async (
 };
 
 // ── Add Student to Center
-export const addStudentToCenter = async (req: Request, res: Response) => {
+export const addStudentToCenter = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { studentId } = req.body;
@@ -686,13 +686,32 @@ export const addStudentToCenter = async (req: Request, res: Response) => {
       return;
     }
 
-    await pool.query(
-      `INSERT INTO student_centers (student_id, center_id, is_current)
-       VALUES ($1, $2, TRUE)
-       ON CONFLICT (student_id, center_id)
-       DO UPDATE SET is_current = TRUE, left_at = NULL, joined_at = NOW()`,
-      [studentId, id],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      await client.query(
+        `INSERT INTO student_centers (student_id, center_id, is_current)
+         VALUES ($1, $2, TRUE)
+         ON CONFLICT (student_id, center_id)
+         DO UPDATE SET is_current = TRUE, left_at = NULL, joined_at = NOW()`,
+        [studentId, id],
+      );
+
+      await client.query(
+        `INSERT INTO student_center_logs
+           (student_id, center_id, action, performed_by_id, performed_by_role)
+         VALUES ($1, $2, 'added', $3, $4)`,
+        [studentId, id, req.user!.id, req.user!.role],
+      );
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
 
     res.status(200).json({
       success: true,
@@ -705,7 +724,10 @@ export const addStudentToCenter = async (req: Request, res: Response) => {
 };
 
 // ── Remove Student from Center
-export const removeStudentFromCenter = async (req: Request, res: Response) => {
+export const removeStudentFromCenter = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   try {
     const { id, studentId } = req.params;
 
@@ -737,11 +759,30 @@ export const removeStudentFromCenter = async (req: Request, res: Response) => {
       return;
     }
 
-    await pool.query(
-      `UPDATE student_centers SET is_current = FALSE, left_at = NOW()
-       WHERE student_id = $1 AND center_id = $2 AND is_current = TRUE`,
-      [studentId, id],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      await client.query(
+        `UPDATE student_centers SET is_current = FALSE, left_at = NOW()
+         WHERE student_id = $1 AND center_id = $2 AND is_current = TRUE`,
+        [studentId, id],
+      );
+
+      await client.query(
+        `INSERT INTO student_center_logs
+           (student_id, center_id, action, performed_by_id, performed_by_role)
+         VALUES ($1, $2, 'removed', $3, $4)`,
+        [studentId, id, req.user!.id, req.user!.role],
+      );
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
 
     res.status(200).json({
       success: true,

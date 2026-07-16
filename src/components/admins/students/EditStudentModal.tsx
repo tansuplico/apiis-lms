@@ -141,7 +141,7 @@ export default function EditStudentModal({
   // ── Render
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-gray overflow-y-auto">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
           Edit Student
         </h3>
@@ -213,9 +213,18 @@ export default function EditStudentModal({
               onChange={(e) =>
                 setStudentToEdit({ ...studentToEdit, idNumber: e.target.value })
               }
-              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
+                checkForDuplicates(studentToEdit.idNumber, studentToEdit.id)
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+              }`}
               placeholder="e.g. 18-1234-56"
             />
+            {checkForDuplicates(studentToEdit.idNumber, studentToEdit.id) && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                This ID Number already exists for another student.
+              </p>
+            )}
           </div>
 
           {/* Password */}
@@ -305,7 +314,11 @@ export default function EditStudentModal({
         <div className="mt-8 flex gap-4">
           <button
             onClick={saveEdit}
-            disabled={isEditing || !online}
+            disabled={
+              isEditing ||
+              !online ||
+              checkForDuplicates(studentToEdit.idNumber, studentToEdit.id)
+            }
             className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-medium"
           >
             {isEditing ? "Saving..." : "Save Changes"}

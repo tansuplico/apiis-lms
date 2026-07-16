@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Course } from "@/types/types";
+import { Course, Facilitator } from "@/types/types";
 import { toast } from "react-toastify";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -80,6 +80,8 @@ export default function ViewCenter() {
   const [facilitatorSearch, setFacilitatorSearch] = useState("");
   const [isAssigning, setIsAssigning] = useState<number | null>(null);
   const [isUnassigning, setIsUnassigning] = useState<number | null>(null);
+  const [facilitatorPendingAssign, setFacilitatorPendingAssign] =
+    useState<Facilitator | null>(null);
   const MAX_FACILITATORS = 3;
 
   // ── State: add course selection
@@ -145,6 +147,22 @@ export default function ViewCenter() {
   const centerCourses = courses.filter((c) =>
     (currentCenter?.courses ?? []).includes(c.id),
   );
+
+  const doAssignFacilitator = async (facilitatorId: number) => {
+    if (!currentCenter) return;
+    setIsAssigning(facilitatorId);
+    await assignFacilitator(currentCenter.id, facilitatorId);
+    setIsAssigning(null);
+    setFacilitatorPendingAssign(null);
+  };
+
+  const handleAssignClick = (f: Facilitator) => {
+    if (f.assignedCenterIds.length > 0) {
+      setFacilitatorPendingAssign(f);
+    } else {
+      void doAssignFacilitator(f.id);
+    }
+  };
 
   // ── Handlers: center deletion
   const handleDeleteCenter = async () => {
@@ -309,7 +327,7 @@ export default function ViewCenter() {
               No courses found
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr">
               {filteredCourses.map((course) => (
                 <ViewCenterGridCard
                   key={course.id}
@@ -484,11 +502,7 @@ export default function ViewCenter() {
                           </div>
                           <button
                             disabled={isAssigning === f.id}
-                            onClick={async () => {
-                              setIsAssigning(f.id);
-                              await assignFacilitator(currentCenter.id, f.id);
-                              setIsAssigning(null);
-                            }}
+                            onClick={() => handleAssignClick(f)}
                             className="flex items-center gap-1.5 px-3 py-1.5 mr-3 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             <UserPlus size={15} />
@@ -577,6 +591,55 @@ export default function ViewCenter() {
           onCancel={() => setShowDeleteModal(false)}
           isDeleting={isDeletingCenter}
         />
+      )}
+
+      {facilitatorPendingAssign && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Facilitator Already Assigned
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {facilitatorPendingAssign.firstName}{" "}
+                {facilitatorPendingAssign.lastName}
+              </span>{" "}
+              was already assigned in center
+              {facilitatorPendingAssign.assignedCenterIds.length > 1
+                ? "s"
+                : ""}{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {facilitatorPendingAssign.assignedCenterIds
+                  .map(
+                    (cid) =>
+                      centers.find((c) => c.id === cid)?.title ?? "Unknown",
+                  )
+                  .join(", ")}
+              </span>
+              . Do you still want to assign them to this center as well?
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() =>
+                  void doAssignFacilitator(facilitatorPendingAssign.id)
+                }
+                disabled={isAssigning === facilitatorPendingAssign.id}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 px-6 rounded-xl font-medium transition-all cursor-pointer"
+              >
+                {isAssigning === facilitatorPendingAssign.id
+                  ? "Assigning..."
+                  : "Assign Anyway"}
+              </button>
+              <button
+                onClick={() => setFacilitatorPendingAssign(null)}
+                disabled={isAssigning === facilitatorPendingAssign.id}
+                className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 py-3 px-6 rounded-xl font-medium transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

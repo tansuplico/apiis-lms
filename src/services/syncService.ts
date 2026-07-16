@@ -126,12 +126,18 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
           await db.execute(
             `INSERT INTO local_quiz_questions
               (id, part_id, module_id, course_id, type, question, options,
-               correct_option_index, correct_answer, explanation, order_num)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+               correct_option_index, correct_answer, correct_answers,
+               correct_boolean, matching_pairs, image_url, explanation,
+               order_num)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
              ON CONFLICT(id) DO UPDATE SET
               question=excluded.question, options=excluded.options,
               correct_option_index=excluded.correct_option_index,
               correct_answer=excluded.correct_answer,
+              correct_answers=excluded.correct_answers,
+              correct_boolean=excluded.correct_boolean,
+              matching_pairs=excluded.matching_pairs,
+              image_url=excluded.image_url,
               explanation=excluded.explanation`,
             [
               q.id,
@@ -143,6 +149,14 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
               q.options ? JSON.stringify(q.options) : null,
               q.correctOptionIndex ?? null,
               q.correctAnswer ?? null,
+              q.correctAnswers ? JSON.stringify(q.correctAnswers) : null,
+              typeof q.correctBoolean === "boolean"
+                ? q.correctBoolean
+                  ? 1
+                  : 0
+                : null,
+              q.matchingPairs ? JSON.stringify(q.matchingPairs) : null,
+              q.imageUrl ?? null,
               q.explanation ?? null,
               index,
             ],
@@ -213,6 +227,17 @@ export async function getLocalCourses(): Promise<Course[]> {
                 options: q.options ? JSON.parse(q.options) : null,
                 correctOptionIndex: q.correct_option_index,
                 correctAnswer: q.correct_answer,
+                correctAnswers: q.correct_answers
+                  ? JSON.parse(q.correct_answers)
+                  : undefined,
+                correctBoolean:
+                  q.correct_boolean === null || q.correct_boolean === undefined
+                    ? undefined
+                    : Boolean(q.correct_boolean),
+                matchingPairs: q.matching_pairs
+                  ? JSON.parse(q.matching_pairs)
+                  : undefined,
+                imageUrl: q.image_url ?? undefined,
                 explanation: q.explanation,
               })),
           })),

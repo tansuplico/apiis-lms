@@ -53,7 +53,12 @@ export function useOfflineSync() {
     });
 
     if (isOnline()) {
+      wasOnlineRef.current = true;
       startPoller();
+      (async () => {
+        const pending = await hasPendingProgress();
+        if (pending) await syncOfflineProgress();
+      })();
     } else {
       wasOnlineRef.current = false;
     }

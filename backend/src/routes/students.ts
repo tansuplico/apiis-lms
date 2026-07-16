@@ -8,6 +8,7 @@ import {
   deleteStudent,
   updateStudentProfile,
   resetStudentPassword,
+  getStudentCenterLogs,
 } from "../controllers/studentController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -43,6 +44,12 @@ router.post(
   authenticate,
   authorize("admin", "facilitator"),
   resetStudentPassword,
+);
+router.get(
+  "/:id/center-logs",
+  authenticate,
+  authorize("admin", "facilitator"),
+  getStudentCenterLogs,
 );
 
 // ── Shared routes (admin, facilitator, student)

@@ -17,7 +17,9 @@ import { useCenterStore } from "./useCenterStore";
 import {
   queueCompletePart,
   queueLastVisited,
+  queueQuizAnswers,
   syncPendingProgress,
+  syncPendingQuizAnswers,
 } from "@/services/offlineProgressService";
 import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
@@ -44,7 +46,7 @@ interface StudentStore {
   saveQuizAnswers: (
     courseId: number,
     moduleNum: number,
-    answers: Record<string, number | string>,
+    answers: Record<string, number | string | boolean | string[]>,
   ) => Promise<void>;
   purchaseAccessory: (accessoryId: number, price: number) => Promise<boolean>;
   updateStatus: (status: AccountStatus) => void;
@@ -320,7 +322,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
   saveQuizAnswers: async (
     courseId: number,
     moduleNum: number,
-    answers: Record<string, number | string>,
+    answers: Record<string, number | string | boolean | string[]>,
   ) => {
     try {
       if (!isOnline()) {
@@ -351,9 +353,10 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
         set({ currentStudent: updatedStudent });
         await saveLocalSession(updatedStudent);
+        await queueQuizAnswers(courseId, moduleNum, answers);
 
-        toast.warn(
-          "You're offline. Quiz answers are not recorded and no gems were awarded. Retake this quiz when you're online to receive your reward.",
+        toast.info(
+          "You're offline. Your answers are saved — gems will be awarded once you're back online.",
         );
         return;
       }
@@ -441,7 +444,15 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       studentService.updateLastVisited,
     );
 
-    if (synced > 0) {
+    const {
+      synced: quizSynced,
+      failed: quizFailed,
+      coinsAwarded,
+    } = await syncPendingQuizAnswers(studentService.saveQuizAnswers);
+
+    const totalSynced = synced + quizSynced;
+    const totalFailed = failed + quizFailed;
+    if (totalSynced > 0) {
       const progress = await studentService.getProgress();
       const current = get().currentStudent;
       if (!current) return;
@@ -456,13 +467,19 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       await saveLocalSession(updatedStudent);
 
       toast.success(
-        `${synced} offline progress item${synced > 1 ? "s" : ""} synced.`,
+        `${totalSynced} offline progress item${totalSynced > 1 ? "s" : ""} synced.`,
       );
+
+      if (coinsAwarded > 0) {
+        toast.success(
+          `+${coinsAwarded} gems awarded for quizzes completed offline!`,
+        );
+      }
     }
 
-    if (failed > 0) {
+    if (totalFailed > 0) {
       toast.warn(
-        `${failed} item${failed > 1 ? "s" : ""} couldn't sync — will retry on next connection.`,
+        `${totalFailed} item${totalFailed > 1 ? "s" : ""} couldn't sync — will retry on next connection.`,
       );
     }
   },

@@ -113,17 +113,17 @@ export const getAttendanceByCenter = async (
     let paramCount = 2;
 
     if (date) {
-      dateFilter = `AND a.date = $${paramCount++}`;
+      dateFilter = `AND a.date = $${paramCount++}::date`;
       values.push(String(date));
     } else if (startDate && endDate) {
-      dateFilter = `AND a.date BETWEEN $${paramCount++} AND $${paramCount++}`;
+      dateFilter = `AND a.date BETWEEN $${paramCount++}::date AND $${paramCount++}::date`;
       values.push(String(startDate), String(endDate));
     }
 
     const result = await pool.query(
       `SELECT
         a.id, a.student_id, a.center_id, a.facilitator_id,
-        a.date, a.status, a.submitted_at,
+        TO_CHAR(a.date, 'YYYY-MM-DD') AS date, a.status, a.submitted_at,
         s.first_name, s.last_name, s.id_number, s.profile_picture,
         f.first_name AS facilitator_first_name,
         f.last_name AS facilitator_last_name
@@ -239,13 +239,13 @@ export const getAttendanceByStudent = async (
     let paramCount = 2;
 
     if (startDate && endDate) {
-      dateFilter = `AND a.date BETWEEN $${paramCount++} AND $${paramCount++}`;
+      dateFilter = `AND a.date BETWEEN $${paramCount++}::date AND $${paramCount++}::date`;
       values.push(String(startDate), String(endDate));
     }
 
     const result = await pool.query(
       `SELECT
-        a.id, a.student_id, a.center_id, a.date, a.status, a.submitted_at,
+        a.id, a.student_id, a.center_id, TO_CHAR(a.date, 'YYYY-MM-DD') AS date, a.status, a.submitted_at,
         c.title AS center_title
        FROM attendance a
        INNER JOIN centers c ON c.id = a.center_id
@@ -385,13 +385,14 @@ export const submitAttendance = async (req: AuthRequest, res: Response) => {
         const result = await client.query(
           `INSERT INTO attendance
             (student_id, center_id, facilitator_id, date, status)
-           VALUES ($1, $2, $3, $4, $5)
+           VALUES ($1, $2, $3, $4::date, $5)
            ON CONFLICT (student_id, center_id, date)
            DO UPDATE SET
              status = $5,
              facilitator_id = $3,
              submitted_at = NOW()
-           RETURNING id, student_id, center_id, facilitator_id, date, status, submitted_at`,
+           RETURNING id, student_id, center_id, facilitator_id,
+             TO_CHAR(date, 'YYYY-MM-DD') AS date, status, submitted_at`,
           [
             Number(record.studentId),
             centerId,
@@ -553,7 +554,7 @@ export const getAttendanceSummary = async (req: AuthRequest, res: Response) => {
     let paramCount = 2;
 
     if (startDate && endDate) {
-      dateFilter = `AND a.date BETWEEN $${paramCount++} AND $${paramCount++}`;
+      dateFilter = `AND a.date BETWEEN $${paramCount++}::date AND $${paramCount++}::date`; // ← ::date cast added
       values.push(String(startDate), String(endDate));
     }
 
@@ -578,8 +579,8 @@ export const getAttendanceSummary = async (req: AuthRequest, res: Response) => {
         COUNT(*) FILTER (WHERE status = 'absent') AS total_absent,
         COUNT(DISTINCT date) AS total_days,
         COUNT(DISTINCT student_id) AS total_students
-       FROM attendance
-       WHERE center_id = $1 ${dateFilter}`,
+       FROM attendance a
+       WHERE center_id = $1 ${dateFilter}`, // ← "FROM attendance" → "FROM attendance a" (was the alias bug)
       values,
     );
 
@@ -722,14 +723,14 @@ export const getAttendanceByFacilitator = async (
     let paramCount = 2;
 
     if (startDate && endDate) {
-      dateFilter = `AND a.date BETWEEN $${paramCount++} AND $${paramCount++}`;
+      dateFilter = `AND a.date BETWEEN $${paramCount++}::date AND $${paramCount++}::date`;
       values.push(String(startDate), String(endDate));
     }
 
     const result = await pool.query(
       `SELECT
         a.id, a.student_id, a.center_id, a.facilitator_id,
-        a.date, a.status, a.submitted_at,
+        TO_CHAR(a.date, 'YYYY-MM-DD') AS date, a.status, a.submitted_at,
         s.first_name, s.last_name, s.id_number, s.profile_picture,
         c.title AS center_title
        FROM attendance a

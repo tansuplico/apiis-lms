@@ -60,10 +60,32 @@ async function initSchema(d: Database): Promise<void> {
       options TEXT,
       correct_option_index INTEGER,
       correct_answer TEXT,
+      correct_answers TEXT,
+      correct_boolean INTEGER,
+      matching_pairs TEXT,
+      image_url TEXT,
       explanation TEXT,
       order_num INTEGER
     )
   `);
+
+  const existingColumns = await d.select<{ name: string }[]>(
+    `PRAGMA table_info(local_quiz_questions)`,
+  );
+  const columnNames = new Set(existingColumns.map((c) => c.name));
+  const newColumns: [string, string][] = [
+    ["correct_answers", "TEXT"],
+    ["correct_boolean", "INTEGER"],
+    ["matching_pairs", "TEXT"],
+    ["image_url", "TEXT"],
+  ];
+  for (const [name, ddlType] of newColumns) {
+    if (!columnNames.has(name)) {
+      await d.execute(
+        `ALTER TABLE local_quiz_questions ADD COLUMN ${name} ${ddlType}`,
+      );
+    }
+  }
 
   await d.execute(`
     CREATE TABLE IF NOT EXISTS local_student (
@@ -100,6 +122,16 @@ async function initSchema(d: Database): Promise<void> {
     module_number INTEGER NOT NULL,
     part_slug TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  )
+`);
+
+  await d.execute(`
+    CREATE TABLE IF NOT EXISTS local_pending_quiz_answers (
+    course_id INTEGER NOT NULL,
+    module_number INTEGER NOT NULL,
+    answers TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (course_id, module_number)
   )
 `);
 }

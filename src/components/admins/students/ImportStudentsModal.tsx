@@ -63,6 +63,10 @@ export default function ImportStudentsModal({
       return;
     }
 
+    const { students: existingStudents } = useStudentListStore.getState();
+    const existingIds = new Set(existingStudents.map((s) => s.idNumber));
+    const seenInFile = new Set<string>();
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
@@ -92,6 +96,23 @@ export default function ImportStudentsModal({
             });
             return;
           }
+
+          const trimmedIdNumber = row.idNumber.trim();
+          if (existingIds.has(trimmedIdNumber)) {
+            invalid.push({
+              row: rowNum,
+              reason: `ID Number already exists: ${trimmedIdNumber}`,
+            });
+            return;
+          }
+          if (seenInFile.has(trimmedIdNumber)) {
+            invalid.push({
+              row: rowNum,
+              reason: `Duplicate ID Number within this file: ${trimmedIdNumber}`,
+            });
+            return;
+          }
+          seenInFile.add(trimmedIdNumber);
 
           const center = row.center?.trim()
             ? centers.find(
@@ -165,7 +186,7 @@ export default function ImportStudentsModal({
   // ── Render
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-3xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-3xl w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-gray overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
             Import Preview
@@ -260,7 +281,7 @@ export default function ImportStudentsModal({
         {csvPreview.invalid.length > 0 && (
           <div className="mb-6">
             <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3">
-              ✗ {csvPreview.invalid.length} row(s) will be skipped
+              {csvPreview.invalid.length} row(s) will be skipped
             </h4>
             <div className="space-y-2">
               {csvPreview.invalid.map((err, i) => (

@@ -740,3 +740,75 @@ export const resetStudentPassword = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };
+
+// ── Get Student Center Transfer Logs
+export const getStudentCenterLogs = async (req: AuthRequest, res: Response) => {
+  try {
+    const idParam = req.params.id as string;
+    const studentId = parseInt(idParam);
+    if (isNaN(studentId)) {
+      res.status(400).json({ success: false, message: "Invalid student ID." });
+      return;
+    }
+
+    const { id: requesterId, role } = req.user!;
+
+    const existing = await pool.query(`SELECT id FROM students WHERE id = $1`, [
+      studentId,
+    ]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, message: "Student not found." });
+      return;
+    }
+
+    if (role === "facilitator") {
+      const inCenter = await pool.query(
+        `SELECT sc.student_id
+         FROM student_centers sc
+         INNER JOIN center_facilitators cf ON cf.center_id = sc.center_id
+         WHERE cf.facilitator_id = $1 AND sc.student_id = $2 AND sc.is_current = TRUE`,
+        [requesterId, studentId],
+      );
+      if (inCenter.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message:
+            "You can only view logs for students in your assigned centers.",
+        });
+        return;
+      }
+    }
+
+    const logs = await pool.query(
+      `SELECT
+         scl.id, scl.action, scl.created_at, scl.performed_by_role,
+         c.title AS center_title,
+         CASE
+           WHEN scl.performed_by_role = 'admin' THEN
+             (SELECT first_name || ' ' || last_name FROM admins WHERE id = scl.performed_by_id)
+           WHEN scl.performed_by_role = 'facilitator' THEN
+             (SELECT first_name || ' ' || last_name FROM facilitators WHERE id = scl.performed_by_id)
+         END AS performed_by_name
+       FROM student_center_logs scl
+       JOIN centers c ON c.id = scl.center_id
+       WHERE scl.student_id = $1
+       ORDER BY scl.created_at DESC`,
+      [studentId],
+    );
+
+    res.status(200).json({
+      success: true,
+      data: logs.rows.map((row) => ({
+        id: row.id,
+        action: row.action,
+        centerTitle: row.center_title,
+        performedByName: row.performed_by_name ?? "Unknown user",
+        performedByRole: row.performed_by_role,
+        createdAt: row.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("getStudentCenterLogs error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};

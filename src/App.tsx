@@ -61,6 +61,8 @@ import AdminAttendance from "@pages/admins/Attendance";
 import AdminAttendanceDetail from "@/pages/shared/AttendanceDetail";
 import AdminShop from "@pages/admins/Shop";
 
+import QuestionBank from "@/pages/admins/QuestionBank";
+
 import ChangePassword from "./pages/students/ChangePassword";
 import ScrollToTop from "./components/shared/ScrollToTop";
 import PublicRoute from "./components/shared/PublicRoute";
@@ -234,6 +236,7 @@ export default function App() {
             <Route path="dashboard" element={<FacilitatorDashboard />} />
             <Route path="profile" element={<FacilitatorProfile />} />
             <Route path="students" element={<FacilitatorStudents />} />
+            <Route path="question-bank" element={<QuestionBank />} />
             <Route path="attendance" element={<FacilitatorAttendance />} />
             <Route
               path="attendance/:attendanceId"
@@ -279,6 +282,7 @@ export default function App() {
             <Route path="profile" element={<AdminProfile />} />
             <Route path="attendance" element={<AdminAttendance />} />
             <Route path="shop" element={<AdminShop />} />
+            <Route path="question-bank" element={<QuestionBank />} />
             <Route
               path="attendance/:attendanceId"
               element={<AdminAttendanceDetail />}

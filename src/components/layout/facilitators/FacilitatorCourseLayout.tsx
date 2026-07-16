@@ -42,6 +42,7 @@ export default function FacilitatorCourseLayout() {
     addModule: storeAddModule,
     deleteModule: storeDeleteModule,
     addPart: storeAddPart,
+    updatePart: storeUpdatePart,
     deletePart: storeDeletePart,
     updateModule: storeUpdateModule,
     uploadVideo: storeUploadVideo,
@@ -87,7 +88,8 @@ export default function FacilitatorCourseLayout() {
   // ── State: editing module title
   const [editingModuleId, setEditingModuleId] = useState<number | null>(null);
   const [editingModuleTitle, setEditingModuleTitle] = useState("");
-
+  const [editingPartId, setEditingPartId] = useState<number | null>(null);
+  const [editingPartName, setEditingPartName] = useState("");
   // ── State: video upload
   const [uploadingModuleId, setUploadingModuleId] = useState<number | null>(
     null,
@@ -167,14 +169,15 @@ export default function FacilitatorCourseLayout() {
       p.slug.startsWith(type),
     ).length;
 
-    if (existingCount >= 2) return;
-
-    const slug = existingCount === 0 ? type : `${type}-2`;
+    const slug = existingCount === 0 ? type : `${type}-${existingCount + 1}`;
 
     try {
       await storeAddPart(course.id, module.id, {
         slug,
-        name: existingCount === 0 ? predefined.name : `${predefined.name} 2`,
+        name:
+          existingCount === 0
+            ? predefined.name
+            : `${predefined.name} ${existingCount + 1}`,
         coverColor: predefined.color,
         content: "",
       });
@@ -515,19 +518,70 @@ export default function FacilitatorCourseLayout() {
                     {mod.parts.map((part) => (
                       <div
                         key={part.slug}
-                        className="flex items-center justify-between py-2 px-3 rounded-md text-sm transition-colors"
+                        className="flex items-center justify-between py-2 px-3 rounded-md text-sm transition-colors group/part"
                       >
-                        <Link
-                          to={`/facilitator/course/${courseSlug}/module-${mod.number}/${part.slug}`}
-                          className={`flex-1 truncate ${
-                            part.slug === partSlug
-                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
-                              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          }`}
-                          title={part.name}
-                        >
-                          {part.name}
-                        </Link>
+                        {isEditMode && editingPartId === part.id ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingPartName}
+                            onChange={(e) => setEditingPartName(e.target.value)}
+                            onBlur={async () => {
+                              if (
+                                editingPartName.trim() &&
+                                editingPartName.trim() !== part.name
+                              ) {
+                                await storeUpdatePart(
+                                  course.id,
+                                  mod.id,
+                                  part.id,
+                                  {
+                                    name: editingPartName.trim(),
+                                    expectedUpdatedAt: part.updatedAt,
+                                  },
+                                );
+                              }
+                              setEditingPartId(null);
+                            }}
+                            onKeyDown={async (e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              } else if (e.key === "Escape") {
+                                setEditingPartId(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 text-sm bg-white dark:bg-gray-800 border border-blue-500 rounded px-2 py-0.5 focus:outline-none text-gray-900 dark:text-white"
+                            maxLength={100}
+                          />
+                        ) : (
+                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                            <Link
+                              to={`/facilitator/course/${courseSlug}/module-${mod.number}/${part.slug}`}
+                              className={`flex-1 truncate ${
+                                part.slug === partSlug
+                                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
+                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                              }`}
+                              title={part.name}
+                            >
+                              {part.name}
+                            </Link>
+                            {isEditMode && (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setEditingPartId(part.id);
+                                  setEditingPartName(part.name);
+                                }}
+                                className="shrink-0 p-1 text-blue-500 dark:text-blue-400 opacity-0 group-hover/part:opacity-100 transition-opacity cursor-pointer"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                            )}
+                          </div>
+                        )}{" "}
                       </div>
                     ))}
                   </div>

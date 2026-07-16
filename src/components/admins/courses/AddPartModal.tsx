@@ -45,21 +45,20 @@ export default function AddPartModal({
           </button>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          Each part can be added up to 2 times per module.
+          Add as many Lessons or Activities parts as this module needs.{" "}
         </p>
         <div className="space-y-3">
           {partOptions.map((part) => {
             const existingCount = moduleParts.filter((p) =>
               p.slug.startsWith(part.slug),
             ).length;
-            const isMaxed = existingCount >= 2;
             return (
               <button
                 key={part.slug}
-                onClick={() => !isMaxed && onAddPart(part.slug)}
-                disabled={isMaxed || !online}
+                onClick={() => onAddPart(part.slug)}
+                disabled={!online}
                 className={`w-full flex items-center justify-between gap-4 p-4 rounded-xl border-2 transition-all text-left ${
-                  isMaxed || !online
+                  !online
                     ? "border-gray-200 dark:border-gray-700 opacity-40 cursor-not-allowed"
                     : "border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
                 }`}
@@ -73,17 +72,11 @@ export default function AddPartModal({
                     {part.name}
                   </p>
                 </div>
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    isMaxed
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                      : existingCount === 1
-                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  }`}
-                >
-                  {isMaxed ? "Max reached" : `${existingCount}/2 added`}
-                </span>
+                {existingCount > 0 && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    {existingCount} added
+                  </span>
+                )}
               </button>
             );
           })}

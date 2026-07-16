@@ -67,16 +67,28 @@ export type Center = {
 export type QuizQuestionType =
   | "multiple_choice"
   | "identification"
-  | "fill_in_the_blank";
+  | "fill_in_the_blank"
+  | "true_false"
+  | "matching";
+
+export type MatchingPair = {
+  left: string;
+  right: string;
+};
 
 export type QuizQuestion = {
   id: number;
   type: QuizQuestionType;
   question: string;
-  options?: string[];
-  correctOptionIndex?: number;
-  correctAnswer?: string;
+  imageUrl?: string;
+  options?: string[]; // multiple_choice
+  correctOptionIndex?: number; // multiple_choice
+  correctAnswer?: string; // fill_in_the_blank (single blank, one accepted answer)
+  correctAnswers?: string[]; // identification (any of these accepted, case-insensitive)
+  correctBoolean?: boolean; // true_false
+  matchingPairs?: MatchingPair[]; // matching
   explanation?: string;
+  bankQuestionId?: number;
 };
 
 export type CoursePart = {
@@ -143,7 +155,10 @@ export type CourseProgress = {
   completedParts: string[];
   lastVisitedModule: number;
   lastVisitedPart: string;
-  quizAnswers: Record<number, Record<string, number | string>>;
+  quizAnswers: Record<
+    number,
+    Record<string, number | string | boolean | string[]>
+  >;
 };
 
 // ─── Accessories ──────────────────────────────────────────────
@@ -179,6 +194,7 @@ export type AttendanceRecord = {
   status: AttendanceStatus;
   date?: string;
   centerId?: number;
+  centerTitle?: string;
   facilitatorId?: number;
 };
 
@@ -241,3 +257,11 @@ export interface CourseCardProps {
 export interface PersonalInfoProps {
   role: Role;
 }
+
+export type BankQuestion = Omit<QuizQuestion, "bankQuestionId"> & {
+  courseId: number | null;
+  createdById: number;
+  createdByRole: "admin" | "facilitator";
+  createdAt: string;
+  updatedAt: string;
+};

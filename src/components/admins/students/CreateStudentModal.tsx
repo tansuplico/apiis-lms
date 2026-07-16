@@ -20,7 +20,7 @@ export default function CreateStudentModal({
 }: CreateStudentModalProps) {
   // ── Store
   const { centers } = useCenterStore();
-  const { addStudent } = useStudentListStore();
+  const { addStudent, students } = useStudentListStore();
   const online = useOnlineStatus();
 
   // ── State: form & UI
@@ -41,6 +41,12 @@ export default function CreateStudentModal({
 
   const isValidStudentId = (id: string): boolean =>
     /^\d{2}-\d{4}-\d{2}$/.test(id);
+
+  const isDuplicateId = (idNumber: string): boolean => {
+    const trimmed = idNumber.trim();
+    if (!trimmed) return false;
+    return students.some((s) => s.idNumber === trimmed);
+  };
 
   const validateFields = (): boolean => {
     const { firstName, lastName, idNumber, password } = newStudent;
@@ -192,14 +198,24 @@ export default function CreateStudentModal({
                   idNumber: formatStudentId(e.target.value),
                 })
               }
-              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
+                isDuplicateId(newStudent.idNumber)
+                  ? "border-red-400 dark:border-red-500 focus:ring-red-500"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+              }`}
               placeholder="e.g. 18-1234-56"
               maxLength={10}
               inputMode="numeric"
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Format: 00-0000-00
-            </p>
+            {isDuplicateId(newStudent.idNumber) ? (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                ID Number already exists for another student.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Format: 00-0000-00
+              </p>
+            )}
           </div>
 
           {/* Password */}
@@ -293,7 +309,9 @@ export default function CreateStudentModal({
         <div className="mt-8 flex gap-4">
           <button
             onClick={handleCreate}
-            disabled={isCreating || !online}
+            disabled={
+              isCreating || !online || isDuplicateId(newStudent.idNumber)
+            }
             className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-3 px-6 rounded-xl font-medium"
           >
             {isCreating ? "Creating..." : "Create Student"}

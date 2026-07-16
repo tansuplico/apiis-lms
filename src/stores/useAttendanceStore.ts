@@ -37,8 +37,12 @@ interface AttendanceStore {
   overall: AttendanceOverall | null;
   myRecords: AttendanceRecord[];
   mySummary: StudentAttendanceSummary | null;
+
+  studentRecords: AttendanceRecord[]; // ← added
+  studentSummary: StudentAttendanceSummary | null; // ← added
   isLoading: boolean;
   isSubmitting: boolean;
+  isLoadingStudentRecords: boolean;
 
   saveAttendance: (
     centerId: number,
@@ -62,6 +66,7 @@ interface AttendanceStore {
     centerId: number,
     filters?: { startDate?: string; endDate?: string },
   ) => Promise<void>;
+  fetchStudentAttendance: (studentId: number) => Promise<void>;
 }
 
 export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
@@ -71,8 +76,11 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
   overall: null,
   myRecords: [],
   mySummary: null,
+  studentRecords: [], // ← added
+  studentSummary: null,
   isLoading: false,
   isSubmitting: false,
+  isLoadingStudentRecords: false,
 
   // ── Actions: save attendance
   saveAttendance: async (centerId, records, date) => {
@@ -196,6 +204,21 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
       toast.error(err.message ?? "Failed to fetch summary.");
     } finally {
       set({ isLoading: false });
+    }
+  },
+  // ── Actions: fetch one student's full attendance history (all centers)
+  fetchStudentAttendance: async (studentId) => {
+    set({ isLoadingStudentRecords: true });
+    try {
+      const result = await attendanceService.getByStudent(studentId);
+      set({
+        studentRecords: result.records,
+        studentSummary: result.summary,
+      });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to fetch student's attendance.");
+    } finally {
+      set({ isLoadingStudentRecords: false });
     }
   },
 }));

@@ -12,6 +12,13 @@ const MAX_TITLE_LENGTH = 100;
 const MAX_CONTENT_SIZE = 500 * 1024;
 const MAX_QUIZ_QUESTIONS = 50;
 const MAX_QUIZ_OPTIONS = 6;
+const MAX_MATCHING_PAIRS = 6;
+const MAX_IDENTIFICATION_ANSWERS = 10;
+// Question images are embedded as base64 data URIs (same pattern as course
+// content images), not just http(s)/api URLs — hence the separate regex.
+const QUESTION_IMAGE_REGEX =
+  /^(https?:\/\/.+|\/api\/.+|data:image\/(jpeg|png|webp|gif);base64,.+)/;
+const MAX_QUESTION_IMAGE_SIZE = 1.5 * 1024 * 1024; // base64 string length
 
 // ── Helpers
 async function facilitatorOwnsCourse(
@@ -179,9 +186,13 @@ export const getAllCourses = async (req: Request, res: Response) => {
                   id: q.id,
                   type: q.question_data.type ?? "multiple_choice",
                   question: q.question_data.question,
+                  imageUrl: q.question_data.imageUrl,
                   options: q.question_data.options,
                   correctOptionIndex: q.question_data.correctOptionIndex,
                   correctAnswer: q.question_data.correctAnswer,
+                  correctAnswers: q.question_data.correctAnswers,
+                  correctBoolean: q.question_data.correctBoolean,
+                  matchingPairs: q.question_data.matchingPairs,
                   explanation: q.question_data.explanation,
                 }));
 
@@ -351,9 +362,13 @@ export const getCourse = async (req: Request, res: Response) => {
               id: q.id,
               type: q.question_data.type ?? "multiple_choice",
               question: q.question_data.question,
+              imageUrl: q.question_data.imageUrl,
               options: q.question_data.options,
               correctOptionIndex: q.question_data.correctOptionIndex,
               correctAnswer: q.question_data.correctAnswer,
+              correctAnswers: q.question_data.correctAnswers,
+              correctBoolean: q.question_data.correctBoolean,
+              matchingPairs: q.question_data.matchingPairs,
               explanation: q.question_data.explanation,
             }));
 
@@ -1394,9 +1409,13 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
       const type = q.type ?? "multiple_choice";
 
       if (
-        !["multiple_choice", "identification", "fill_in_the_blank"].includes(
-          type,
-        )
+        ![
+          "multiple_choice",
+          "identification",
+          "fill_in_the_blank",
+          "true_false",
+          "matching",
+        ].includes(type)
       ) {
         res.status(400).json({
           success: false,
@@ -1411,6 +1430,26 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
           message: `Question ${i + 1} is missing question text.`,
         });
         return;
+      }
+
+      if (q.imageUrl !== undefined && q.imageUrl !== null) {
+        if (
+          typeof q.imageUrl !== "string" ||
+          !QUESTION_IMAGE_REGEX.test(q.imageUrl)
+        ) {
+          res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} has an invalid image URL.`,
+          });
+          return;
+        }
+        if (q.imageUrl.length > MAX_QUESTION_IMAGE_SIZE) {
+          res.status(400).json({
+            success: false,
+            message: `Question ${i + 1}'s image is too large.`,
+          });
+          return;
+        }
       }
 
       if (type === "multiple_choice") {
@@ -1445,7 +1484,59 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
           });
           return;
         }
+      } else if (type === "identification") {
+        if (
+          !Array.isArray(q.correctAnswers) ||
+          q.correctAnswers.length < 1 ||
+          q.correctAnswers.length > MAX_IDENTIFICATION_ANSWERS
+        ) {
+          res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} must have between 1 and ${MAX_IDENTIFICATION_ANSWERS} accepted answers.`,
+          });
+          return;
+        }
+        for (let j = 0; j < q.correctAnswers.length; j++) {
+          if (!q.correctAnswers[j]?.trim()) {
+            res.status(400).json({
+              success: false,
+              message: `Question ${i + 1}, accepted answer ${j + 1} cannot be empty.`,
+            });
+            return;
+          }
+        }
+      } else if (type === "true_false") {
+        if (typeof q.correctBoolean !== "boolean") {
+          res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} must have a true/false correct answer.`,
+          });
+          return;
+        }
+      } else if (type === "matching") {
+        if (
+          !Array.isArray(q.matchingPairs) ||
+          q.matchingPairs.length < 2 ||
+          q.matchingPairs.length > MAX_MATCHING_PAIRS
+        ) {
+          res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} must have between 2 and ${MAX_MATCHING_PAIRS} matching pairs.`,
+          });
+          return;
+        }
+        for (let j = 0; j < q.matchingPairs.length; j++) {
+          const pair = q.matchingPairs[j];
+          if (!pair?.left?.trim() || !pair?.right?.trim()) {
+            res.status(400).json({
+              success: false,
+              message: `Question ${i + 1}, matching pair ${j + 1} must have both sides filled in.`,
+            });
+            return;
+          }
+        }
       } else {
+        // fill_in_the_blank
         if (!q.correctAnswer?.trim()) {
           res.status(400).json({
             success: false,
@@ -1453,7 +1544,7 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
           });
           return;
         }
-        if (type === "fill_in_the_blank" && !q.question.includes("___")) {
+        if (!q.question.includes("___")) {
           res.status(400).json({
             success: false,
             message: `Question ${i + 1} must contain ___ to mark the blank.`,
@@ -1501,6 +1592,33 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
 
       for (const q of questions) {
         const type = q.type ?? "multiple_choice";
+
+        let typeFields: Record<string, unknown>;
+        if (type === "multiple_choice") {
+          typeFields = {
+            options: q.options.map((o: string) => o.trim()),
+            correctOptionIndex: q.correctOptionIndex,
+          };
+        } else if (type === "identification") {
+          typeFields = {
+            correctAnswers: q.correctAnswers.map((a: string) => a.trim()),
+          };
+        } else if (type === "true_false") {
+          typeFields = { correctBoolean: q.correctBoolean };
+        } else if (type === "matching") {
+          typeFields = {
+            matchingPairs: q.matchingPairs.map(
+              (p: { left: string; right: string }) => ({
+                left: p.left.trim(),
+                right: p.right.trim(),
+              }),
+            ),
+          };
+        } else {
+          // fill_in_the_blank
+          typeFields = { correctAnswer: q.correctAnswer.trim() };
+        }
+
         await client.query(
           `INSERT INTO quiz_questions (part_id, question_data) VALUES ($1, $2)`,
           [
@@ -1508,14 +1626,8 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
             JSON.stringify({
               type,
               question: q.question.trim(),
-              ...(type === "multiple_choice"
-                ? {
-                    options: q.options.map((o: string) => o.trim()),
-                    correctOptionIndex: q.correctOptionIndex,
-                  }
-                : {
-                    correctAnswer: q.correctAnswer.trim(),
-                  }),
+              ...(q.imageUrl?.trim() ? { imageUrl: q.imageUrl.trim() } : {}),
+              ...typeFields,
               explanation: q.explanation?.trim() || null,
             }),
           ],

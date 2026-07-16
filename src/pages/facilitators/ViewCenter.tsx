@@ -218,7 +218,8 @@ export default function ViewCenter() {
               No courses found
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr">
+              {" "}
               {filteredCourses.map((course) => (
                 <ViewCenterGridCard
                   key={course.id}
@@ -261,6 +262,7 @@ export default function ViewCenter() {
       {activeTab === "attendance" && (
         <AttendanceTab
           centerId={currentCenter.id}
+          centerName={centerTitle}   
           centerStudents={centerStudents}
         />
       )}
