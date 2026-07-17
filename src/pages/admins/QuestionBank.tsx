@@ -1,11 +1,27 @@
 // src/pages/admins/QuestionBank.tsx
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Plus, Trash2, Pencil, Image as ImageIcon, X } from "lucide-react";
-import { BankQuestion, Course, QuizQuestionType } from "@/types/types";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Image as ImageIcon,
+  X,
+  ArrowLeft,
+  LayoutGrid,
+  List as ListIcon,
+} from "lucide-react";
+import {
+  BankQuestion,
+  QuizBankCollection,
+  QuizQuestionType,
+} from "@/types/types";
 import { questionBankService } from "@/services/questionBankService";
-import { courseService } from "@/services/courseService";
+import { quizBankCollectionService } from "@/services/bankCollectionService";
 import { tokenStorage } from "@/services/tokenStorage";
+import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkeleton";
+import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
+import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
 
 const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
@@ -15,13 +31,33 @@ const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   matching: "Matching",
 };
 
+// Deterministic per-collection accent, keyed by id (not name) so renaming
+// a collection never shuffles its color.
+const COLLECTION_COLORS = [
+  "#3B82F6", // blue
+  "#10B981", // green
+  "#F59E0B", // amber
+  "#EF4444", // red
+  "#06B6D4", // cyan
+  "#EC4899", // pink
+  "#6366F1", // indigo
+  "#14B8A6", // teal
+];
+const colorForCollection = (id: number) =>
+  COLLECTION_COLORS[id % COLLECTION_COLORS.length];
+
+const SKELETON_COUNT = 6;
+
 type DraftQuestion = Omit<
   BankQuestion,
   "id" | "createdById" | "createdByRole" | "createdAt" | "updatedAt"
 >;
 
-const emptyDraft = (type: QuizQuestionType): DraftQuestion => {
-  const base = { type, question: "", explanation: "", courseId: null };
+const emptyDraft = (
+  type: QuizQuestionType,
+  collectionId: number,
+): DraftQuestion => {
+  const base = { type, question: "", explanation: "", collectionId };
   switch (type) {
     case "multiple_choice":
       return { ...base, options: ["", "", "", ""], correctOptionIndex: 0 };
@@ -44,37 +80,142 @@ const emptyDraft = (type: QuizQuestionType): DraftQuestion => {
 };
 
 export default function QuestionBank() {
+  const [collections, setCollections] = useState<QuizBankCollection[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const [activeCollection, setActiveCollection] =
+    useState<QuizBankCollection | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(
+    () =>
+      (localStorage.getItem("qb-collection-view") as "grid" | "list") || "grid",
+  );
+
+  const changeViewMode = (mode: "grid" | "list") => {
+    setViewMode(mode);
+    localStorage.setItem("qb-collection-view", mode);
+  };
+
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<DraftQuestion>(
-    emptyDraft("multiple_choice"),
+    emptyDraft("multiple_choice", 0),
   );
   const [saving, setSaving] = useState(false);
 
+  const [collectionModalMode, setCollectionModalMode] = useState<
+    "new" | QuizBankCollection | null
+  >(null);
+  const [collectionDraft, setCollectionDraft] = useState({
+    name: "",
+    description: "",
+  });
+  const [savingCollection, setSavingCollection] = useState(false);
+
   useEffect(() => {
-    loadQuestions();
-    courseService
-      .getAll()
-      .then(setCourses)
-      .catch(() => toast.error("Failed to load courses."));
+    loadCollections();
   }, []);
 
-  const loadQuestions = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (activeCollection) loadQuestions(activeCollection.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCollection?.id]);
+
+  const loadCollections = async () => {
+    setCollectionsLoading(true);
     try {
-      const data = await questionBankService.getAll();
+      const data = await quizBankCollectionService.getAll();
+      setCollections(data);
+    } catch {
+      toast.error("Failed to load collections.");
+    } finally {
+      setCollectionsLoading(false);
+    }
+  };
+
+  const loadQuestions = async (collectionId: number) => {
+    setQuestionsLoading(true);
+    try {
+      const data = await questionBankService.getAll(collectionId);
       setQuestions(data);
     } catch {
-      toast.error("Failed to load the question bank.");
+      toast.error("Failed to load questions.");
     } finally {
-      setLoading(false);
+      setQuestionsLoading(false);
+    }
+  };
+
+  const openCollection = (c: QuizBankCollection) => setActiveCollection(c);
+  const backToCollections = () => {
+    setActiveCollection(null);
+    setQuestions([]);
+  };
+
+  const startCreateCollection = () => {
+    setCollectionDraft({ name: "", description: "" });
+    setCollectionModalMode("new");
+  };
+
+  const startRenameCollection = (c: QuizBankCollection) => {
+    setCollectionDraft({ name: c.name, description: c.description ?? "" });
+    setCollectionModalMode(c);
+  };
+
+  const cancelCollectionModal = () => setCollectionModalMode(null);
+
+  const saveCollection = async () => {
+    if (!collectionDraft.name.trim()) {
+      toast.warning("Enter a collection name first.");
+      return;
+    }
+    setSavingCollection(true);
+    try {
+      if (collectionModalMode === "new") {
+        await quizBankCollectionService.create(collectionDraft);
+        toast.success("Collection created.");
+      } else if (collectionModalMode) {
+        const updated = await quizBankCollectionService.update(
+          collectionModalMode.id,
+          collectionDraft,
+        );
+        toast.success("Collection renamed.");
+        if (activeCollection?.id === updated.id) setActiveCollection(updated);
+      }
+      setCollectionModalMode(null);
+      loadCollections();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save the collection.",
+      );
+    } finally {
+      setSavingCollection(false);
+    }
+  };
+
+  const removeCollection = async (c: QuizBankCollection) => {
+    if (
+      !window.confirm(
+        `Delete "${c.name}"? This deletes all ${c.questionCount} question(s) inside it and removes them from any quiz that uses them.`,
+      )
+    )
+      return;
+    try {
+      const result = await quizBankCollectionService.delete(c.id);
+      toast.success(
+        result.quizzesAffected > 0
+          ? `Deleted. Removed from ${result.quizzesAffected} quiz(zes).`
+          : "Deleted.",
+      );
+      if (activeCollection?.id === c.id) backToCollections();
+      loadCollections();
+    } catch {
+      toast.error("Failed to delete the collection.");
     }
   };
 
   const startCreate = () => {
-    setDraft(emptyDraft("multiple_choice"));
+    if (!activeCollection) return;
+    setDraft(emptyDraft("multiple_choice", activeCollection.id));
     setEditingId("new");
   };
 
@@ -90,7 +231,7 @@ export default function QuestionBank() {
       correctBoolean: q.correctBoolean,
       matchingPairs: q.matchingPairs,
       explanation: q.explanation,
-      courseId: q.courseId,
+      collectionId: q.collectionId,
     });
     setEditingId(q.id);
   };
@@ -99,11 +240,10 @@ export default function QuestionBank() {
 
   const changeType = (type: QuizQuestionType) => {
     setDraft((prev) => ({
-      ...emptyDraft(type),
+      ...emptyDraft(type, prev.collectionId),
       question: prev.question,
       explanation: prev.explanation,
       imageUrl: prev.imageUrl,
-      courseId: prev.courseId,
     }));
   };
 
@@ -143,13 +283,13 @@ export default function QuestionBank() {
     try {
       if (editingId === "new") {
         await questionBankService.create(draft);
-        toast.success("Question added to the bank.");
+        toast.success("Question added to the collection.");
       } else if (typeof editingId === "number") {
         await questionBankService.update(editingId, draft);
         toast.success("Question updated.");
       }
       setEditingId(null);
-      loadQuestions();
+      if (activeCollection) loadQuestions(activeCollection.id);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to save the question.",
@@ -173,23 +313,269 @@ export default function QuestionBank() {
           ? `Deleted. Removed from ${result.quizzesAffected} quiz(zes).`
           : "Deleted.",
       );
-      loadQuestions();
+      if (activeCollection) loadQuestions(activeCollection.id);
+      loadCollections();
     } catch {
       toast.error("Failed to delete the question.");
     }
   };
 
+  if (!activeCollection) {
+    return (
+      <div className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 pb-10">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <h3 className="text-4xl text-gray-900 dark:text-white">
+              Question Bank
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Collections of reusable questions. Any quiz can pull from any
+              collection.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+              <button
+                onClick={() => changeViewMode("list")}
+                className={`p-2.5 rounded ${
+                  viewMode === "list"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                }`}
+                aria-label="List view"
+              >
+                <ListIcon size={24} strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => changeViewMode("grid")}
+                className={`p-2.5 rounded ${
+                  viewMode === "grid"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                }`}
+                aria-label="Grid view"
+              >
+                <LayoutGrid size={24} strokeWidth={1.5} />
+              </button>
+            </div>
+            <button
+              onClick={startCreateCollection}
+              className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+            >
+              <Plus size={20} />
+              New Collection
+            </button>
+          </div>
+        </div>
+
+        {collectionsLoading ? (
+          viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+                <CollectionGridCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden shadow-sm bg-white dark:bg-gray-800">
+              {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+                <CollectionListItemSkeleton key={i} />
+              ))}
+            </div>
+          )
+        ) : collections.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400">
+            No collections yet. Create one to start adding questions.
+          </p>
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {collections.map((c) => (
+              <div
+                key={c.id}
+                className="rounded-lg bg-white dark:bg-gray-800 overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div
+                  className="h-1.5"
+                  style={{ backgroundColor: colorForCollection(c.id) }}
+                />
+                <div
+                  onClick={() => openCollection(c)}
+                  className="p-5 flex-1 cursor-pointer"
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0"
+                      style={{ backgroundColor: colorForCollection(c.id) }}
+                    >
+                      {(c.name.trim().charAt(0) || "?").toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                        {c.name}
+                      </h4>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                        {c.questionCount} question
+                        {c.questionCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+                  {c.description && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 line-clamp-2">
+                      {c.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 px-3 py-2 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                  <button
+                    onClick={() => startRenameCollection(c)}
+                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Rename"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => removeCollection(c)}
+                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden shadow-sm bg-white dark:bg-gray-800">
+            {collections.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+              >
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                  style={{ backgroundColor: colorForCollection(c.id) }}
+                >
+                  {(c.name.trim().charAt(0) || "?").toUpperCase()}
+                </div>
+                <div
+                  onClick={() => openCollection(c)}
+                  className="min-w-0 flex-1 cursor-pointer"
+                >
+                  <p className="font-medium text-gray-900 dark:text-white truncate">
+                    {c.name}
+                  </p>
+                  {c.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {c.description}
+                    </p>
+                  )}
+                </div>
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 hidden sm:inline">
+                  {c.questionCount} question{c.questionCount === 1 ? "" : "s"}
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => startRenameCollection(c)}
+                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Rename"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => removeCollection(c)}
+                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {collectionModalMode !== null && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {collectionModalMode === "new"
+                    ? "New Collection"
+                    : "Rename Collection"}
+                </h2>
+                <button
+                  onClick={cancelCollectionModal}
+                  className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                value={collectionDraft.name}
+                onChange={(e) =>
+                  setCollectionDraft((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                className="w-full p-2 border rounded mb-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                placeholder="e.g. Grade 5 Science — Weather Unit"
+              />
+
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                Description (optional)
+              </label>
+              <textarea
+                value={collectionDraft.description}
+                onChange={(e) =>
+                  setCollectionDraft((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                rows={2}
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={cancelCollectionModal}
+                  className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveCollection}
+                  disabled={savingCollection}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+                >
+                  {savingCollection ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 pb-10">
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h3 className="text-4xl text-gray-900 dark:text-white">
-            Question Bank
+            {activeCollection.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Reusable questions that can be added to any quiz. Editing a question
-            here updates it everywhere it's used.
-          </p>
+          {activeCollection.description && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {activeCollection.description}
+            </p>
+          )}
         </div>
         <button
           onClick={startCreate}
@@ -200,90 +586,59 @@ export default function QuestionBank() {
         </button>
       </div>
 
-      {loading ? (
-        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      {questionsLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <BankQuestionSkeleton key={i} />
+          ))}
+        </div>
       ) : questions.length === 0 ? (
         <p className="text-gray-500 dark:text-gray-400">
-          No questions in the bank yet.
+          No questions in this collection yet.
         </p>
       ) : (
-        <div className="space-y-8">
-          {(() => {
-            const courseTitleById = new Map(
-              courses.map((c) => [c.id, c.title]),
-            );
-            const groups = new Map<number | null, BankQuestion[]>();
-            for (const q of questions) {
-              const key = q.courseId ?? null;
-              if (!groups.has(key)) groups.set(key, []);
-              groups.get(key)!.push(q);
-            }
-
-            const sortedEntries = [...groups.entries()].sort((a, b) => {
-              if (a[0] === null) return 1; // Uncategorized always last
-              if (b[0] === null) return -1;
-              const titleA = courseTitleById.get(a[0]) ?? "";
-              const titleB = courseTitleById.get(b[0]) ?? "";
-              return titleA.localeCompare(titleB);
-            });
-
-            return sortedEntries.map(([courseId, groupQuestions]) => (
-              <div key={courseId ?? "uncategorized"}>
-                <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  {courseId === null
-                    ? "Uncategorized"
-                    : (courseTitleById.get(courseId) ?? "Unknown Course")}
-                  <span className="ml-2 font-normal normal-case text-gray-400 dark:text-gray-500">
-                    ({groupQuestions.length})
-                  </span>
-                </h4>
-                <div className="space-y-3">
-                  {groupQuestions.map((q) => (
-                    <div
-                      key={q.id}
-                      className="p-4 border rounded-lg dark:border-gray-700 bg-white dark:bg-gray-800 flex items-start justify-between gap-4"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                          {QUESTION_TYPE_LABELS[q.type]}
-                        </span>
-                        <p className="font-medium text-gray-900 dark:text-white truncate">
-                          {q.question}
-                        </p>
-                        {q.imageUrl && (
-                          <img
-                            src={q.imageUrl}
-                            alt="Question"
-                            className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => startEdit(q)}
-                          className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                          title="Edit"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => remove(q.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        <div className="space-y-3">
+          {questions.map((q) => (
+            <div
+              key={q.id}
+              className="p-4 rounded-lg bg-white dark:bg-gray-800 flex items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex-1 min-w-0">
+                <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                  {QUESTION_TYPE_LABELS[q.type]}
+                </span>
+                <p className="font-medium text-gray-900 dark:text-white truncate">
+                  {q.question}
+                </p>
+                {q.imageUrl && (
+                  <img
+                    src={q.imageUrl}
+                    alt="Question"
+                    className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
+                  />
+                )}
               </div>
-            ));
-          })()}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => startEdit(q)}
+                  className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  title="Edit"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => remove(q.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                  title="Delete"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Create / Edit modal */}
       {editingId !== null && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -298,27 +653,6 @@ export default function QuestionBank() {
                 <X size={18} />
               </button>
             </div>
-
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Course
-            </label>
-            <select
-              value={draft.courseId ?? ""}
-              onChange={(e) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  courseId: e.target.value ? Number(e.target.value) : null,
-                }))
-              }
-              className="w-full p-2 border rounded mb-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="">Uncategorized</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
 
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Question Type
@@ -398,7 +732,6 @@ export default function QuestionBank() {
               )}
             </div>
 
-            {/* Multiple choice */}
             {draft.type === "multiple_choice" && (
               <div className="space-y-2 mb-3">
                 {(draft.options ?? []).map((opt, idx) => (
@@ -431,7 +764,6 @@ export default function QuestionBank() {
               </div>
             )}
 
-            {/* Identification */}
             {draft.type === "identification" && (
               <div className="mb-3">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -485,7 +817,6 @@ export default function QuestionBank() {
               </div>
             )}
 
-            {/* Fill in the blank */}
             {draft.type === "fill_in_the_blank" && (
               <div className="mb-3">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -506,7 +837,6 @@ export default function QuestionBank() {
               </div>
             )}
 
-            {/* True / False */}
             {draft.type === "true_false" && (
               <div className="mb-3">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -532,7 +862,6 @@ export default function QuestionBank() {
               </div>
             )}
 
-            {/* Matching */}
             {draft.type === "matching" && (
               <div className="mb-3">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">

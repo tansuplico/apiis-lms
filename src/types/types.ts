@@ -188,14 +188,18 @@ export type AccessoryCategory = Accessory["category"];
 export type AttendanceRecord = {
   id: number;
   studentId: number;
-  studentName: string;
-  studentIdNumber: string;
-  studentAvatar: string;
+  student: {
+    firstName: string;
+    lastName: string;
+    idNumber: string;
+    profilePicture: string | null;
+  };
   status: AttendanceStatus;
   date?: string;
   centerId?: number;
   centerTitle?: string;
   facilitatorId?: number;
+  submittedAt?: string;
 };
 
 export type AttendanceSession = {

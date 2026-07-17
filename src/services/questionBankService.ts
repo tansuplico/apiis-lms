@@ -2,8 +2,11 @@ import { apiClient } from "./apiClient";
 import { BankQuestion } from "@/types/types";
 
 export const questionBankService = {
-  getAll: async (): Promise<BankQuestion[]> => {
-    const response = await apiClient.get<BankQuestion[]>("/question-bank");
+  getAll: async (collectionId?: number): Promise<BankQuestion[]> => {
+    const query = collectionId ? `?collectionId=${collectionId}` : "";
+    const response = await apiClient.get<BankQuestion[]>(
+      `/question-bank${query}`,
+    );
     return response.data ?? [];
   },
 

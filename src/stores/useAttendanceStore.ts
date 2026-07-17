@@ -52,7 +52,7 @@ interface AttendanceStore {
 
   getAttendanceByCenter: (centerId: number) => Promise<void>;
   getAttendanceByDate: (centerId: number, date: string) => Promise<void>;
-  getAttendanceByFacilitator: () => Promise<void>;
+  getAttendanceByFacilitator: (facilitatorId?: number) => Promise<void>;
   deleteAttendance: (attendanceId: number) => Promise<void>;
   updateAttendanceRecord: (
     attendanceId: number,
@@ -135,11 +135,24 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
   },
 
   // ── Actions: get by facilitator
-  getAttendanceByFacilitator: async () => {
+  getAttendanceByFacilitator: async (facilitatorId) => {
     set({ isLoading: true });
     try {
-      const records = await attendanceService.getByFacilitator();
-      set({ records });
+      const records = await attendanceService.getByFacilitator(facilitatorId);
+      if (facilitatorId) {
+        // Admin viewing a specific facilitator: merge in, same pattern as
+        // getAttendanceByCenter, so switching between facilitators in the
+        // admin UI doesn't wipe out previously-fetched records.
+        set((state) => ({
+          records: [
+            ...state.records.filter((r) => r.facilitatorId !== facilitatorId),
+            ...records,
+          ],
+        }));
+      } else {
+        // Facilitator viewing their own records: replace wholesale, as before.
+        set({ records });
+      }
     } catch (err: any) {
       toast.error(err.message ?? "Failed to fetch attendance.");
     } finally {

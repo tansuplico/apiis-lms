@@ -115,12 +115,15 @@ export const attendanceService = {
     return response.data!;
   },
 
-  getByFacilitator: async (filters?: {
-    startDate?: string;
-    endDate?: string;
-  }) => {
+  getByFacilitator: async (
+    facilitatorId?: number,
+    filters?: { startDate?: string; endDate?: string },
+  ) => {
+    const path = facilitatorId
+      ? `/attendance/facilitator/${facilitatorId}`
+      : `/attendance/facilitator/me`;
     const response = await apiClient.get<AttendanceRecord[]>(
-      `/attendance/facilitator/me${buildFilterQuery(filters)}`,
+      `${path}${buildFilterQuery(filters)}`,
     );
     return response.data ?? [];
   },
