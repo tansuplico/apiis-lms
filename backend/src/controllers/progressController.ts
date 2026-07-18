@@ -65,6 +65,222 @@ function isAnswerCorrect(qd: any, studentAns: unknown): boolean {
   }
 }
 
+interface GradebookModule {
+  id: number;
+  number: number;
+  title: string;
+  weight: number | null;
+}
+
+interface StudentAnswerRow {
+  module_number: number;
+  answers: Record<string, unknown>;
+  coins_awarded: number | null;
+  submitted_at: unknown;
+}
+
+async function batchFetchQuizData(moduleIds: number[]) {
+  const allQuizParts = await pool.query(
+    `SELECT id, module_id FROM course_parts
+   WHERE module_id = ANY($1) AND slug = 'quiz'`,
+    [moduleIds],
+  );
+
+  // Map module_id → quiz part id for O(1) lookup in loop
+  const quizPartByModuleId = new Map<number, number>(
+    allQuizParts.rows.map((p) => [p.module_id, p.id]),
+  );
+
+  const quizPartIds = allQuizParts.rows.map((p) => p.id);
+
+  const allQuestions =
+    quizPartIds.length > 0
+      ? await pool.query(
+          `SELECT part_id, question_data FROM quiz_questions
+       WHERE part_id = ANY($1) ORDER BY id ASC`,
+          [quizPartIds],
+        )
+      : { rows: [] };
+
+  // Map part_id → questions array for O(1) lookup in loop
+  const questionsByPartId = new Map<number, any[]>();
+  for (const q of allQuestions.rows) {
+    if (!questionsByPartId.has(q.part_id)) {
+      questionsByPartId.set(q.part_id, []);
+    }
+    questionsByPartId.get(q.part_id)!.push(q);
+  }
+
+  return { quizPartByModuleId, questionsByPartId };
+}
+
+function buildStudentGradebook(
+  modules: GradebookModule[],
+  quizPartByModuleId: Map<number, number>,
+  questionsByPartId: Map<number, any[]>,
+  studentAnswerRows: StudentAnswerRow[],
+) {
+  const gradebook = [];
+  let totalQuestions = 0;
+  let totalCorrect = 0;
+
+  for (const module of modules) {
+    const quizPartId = quizPartByModuleId.get(module.id);
+
+    if (!quizPartId) {
+      gradebook.push({
+        moduleNumber: module.number,
+        moduleTitle: module.title,
+        moduleWeight: module.weight ?? null,
+        hasQuiz: false,
+        attempted: false,
+        totalQuestions: 0,
+        correctAnswers: 0,
+        score: null,
+        passed: null,
+        coinsAwarded: 0,
+        submittedAt: null,
+      });
+      continue;
+    }
+
+    const questions = questionsByPartId.get(quizPartId) ?? [];
+    const numQuestions = questions.length;
+
+    if (numQuestions === 0) {
+      gradebook.push({
+        moduleNumber: module.number,
+        moduleTitle: module.title,
+        moduleWeight: module.weight ?? null,
+        hasQuiz: false,
+        attempted: false,
+        totalQuestions: 0,
+        correctAnswers: 0,
+        score: null,
+        passed: null,
+        coinsAwarded: 0,
+        submittedAt: null,
+      });
+      continue;
+    }
+
+    const studentAnswer = studentAnswerRows.find(
+      (a) => a.module_number === module.number,
+    );
+
+    if (!studentAnswer) {
+      gradebook.push({
+        moduleNumber: module.number,
+        moduleTitle: module.title,
+        moduleWeight: module.weight ?? null,
+        hasQuiz: true,
+        attempted: false,
+        totalQuestions: numQuestions,
+        correctAnswers: 0,
+        score: 0,
+        passed: false,
+        coinsAwarded: 0,
+        submittedAt: null,
+      });
+      totalQuestions += numQuestions;
+      continue;
+    }
+
+    const studentAnswers = studentAnswer.answers;
+    let correct = 0;
+
+    questions.forEach((q, index) => {
+      const qd = q.question_data;
+      const studentAns = studentAnswers[String(index)];
+      if (isAnswerCorrect(qd, studentAns)) correct++;
+    });
+
+    const score = Math.round((correct / numQuestions) * 100);
+    const passed = score >= 75;
+
+    totalQuestions += numQuestions;
+    totalCorrect += correct;
+
+    gradebook.push({
+      moduleNumber: module.number,
+      moduleTitle: module.title,
+      moduleWeight: module.weight ?? null,
+      hasQuiz: true,
+      attempted: true,
+      totalQuestions: numQuestions,
+      correctAnswers: correct,
+      score,
+      passed,
+      coinsAwarded: studentAnswer.coins_awarded ?? 0,
+      submittedAt: studentAnswer.submitted_at ?? null,
+    });
+  }
+
+  // Calculate weighted overall score
+  const attemptedModules = gradebook.filter((m) => m.hasQuiz && m.attempted);
+
+  let weightedScore = 0;
+
+  if (attemptedModules.length > 0) {
+    const explicitWeightModules = gradebook.filter(
+      (m) => m.moduleWeight !== null,
+    );
+    const nullWeightModules = gradebook.filter(
+      (m) => m.moduleWeight === null && m.hasQuiz,
+    );
+
+    const explicitWeightSum = explicitWeightModules.reduce(
+      (sum, m) => sum + (m.moduleWeight ?? 0),
+      0,
+    );
+    const remainingWeight = 100 - explicitWeightSum;
+    const equalShare =
+      nullWeightModules.length > 0
+        ? remainingWeight / nullWeightModules.length
+        : 0;
+
+    const effectiveWeights: Record<number, number> = {};
+    for (const m of gradebook) {
+      if (m.moduleWeight !== null) {
+        effectiveWeights[m.moduleNumber] = m.moduleWeight;
+      } else if (m.hasQuiz) {
+        effectiveWeights[m.moduleNumber] = equalShare;
+      } else {
+        effectiveWeights[m.moduleNumber] = 0;
+      }
+    }
+
+    const attemptedWeightSum = attemptedModules.reduce(
+      (sum, m) => sum + (effectiveWeights[m.moduleNumber] ?? 0),
+      0,
+    );
+
+    if (attemptedWeightSum > 0) {
+      weightedScore = attemptedModules.reduce((sum, m) => {
+        const w = effectiveWeights[m.moduleNumber] ?? 0;
+        return sum + ((m.score ?? 0) / 100) * w;
+      }, 0);
+
+      weightedScore = (weightedScore / attemptedWeightSum) * 100;
+    }
+
+    for (const entry of gradebook) {
+      (entry as any).effectiveWeight =
+        effectiveWeights[entry.moduleNumber] ?? 0;
+    }
+  }
+
+  const overallScore = Math.round(weightedScore);
+
+  return {
+    modules: gradebook,
+    overallScore,
+    overallPassed: overallScore >= 75,
+    totalQuestions,
+    totalCorrect,
+  };
+}
+
 // ── Get Student Progress
 export const getStudentProgress = async (req: AuthRequest, res: Response) => {
   try {
@@ -744,189 +960,21 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
 
     // ── Batch fetch quiz parts and questions — replaces per-module queries
     const moduleIds = modulesResult.rows.map((m) => m.id);
+    const { quizPartByModuleId, questionsByPartId } =
+      await batchFetchQuizData(moduleIds);
 
-    const allQuizParts = await pool.query(
-      `SELECT id, module_id FROM course_parts
-   WHERE module_id = ANY($1) AND slug = 'quiz'`,
-      [moduleIds],
+    const {
+      modules: gradebook,
+      overallScore,
+      overallPassed,
+      totalQuestions,
+      totalCorrect,
+    } = buildStudentGradebook(
+      modulesResult.rows,
+      quizPartByModuleId,
+      questionsByPartId,
+      answersResult.rows,
     );
-
-    // Map module_id → quiz part id for O(1) lookup in loop
-    const quizPartByModuleId = new Map<number, number>(
-      allQuizParts.rows.map((p) => [p.module_id, p.id]),
-    );
-
-    const quizPartIds = allQuizParts.rows.map((p) => p.id);
-
-    const allQuestions =
-      quizPartIds.length > 0
-        ? await pool.query(
-            `SELECT part_id, question_data FROM quiz_questions
-       WHERE part_id = ANY($1) ORDER BY id ASC`,
-            [quizPartIds],
-          )
-        : { rows: [] };
-
-    // Map part_id → questions array for O(1) lookup in loop
-    const questionsByPartId = new Map<number, any[]>();
-    for (const q of allQuestions.rows) {
-      if (!questionsByPartId.has(q.part_id)) {
-        questionsByPartId.set(q.part_id, []);
-      }
-      questionsByPartId.get(q.part_id)!.push(q);
-    }
-
-    const gradebook = [];
-    let totalQuestions = 0;
-    let totalCorrect = 0;
-
-    for (const module of modulesResult.rows) {
-      const quizPartId = quizPartByModuleId.get(module.id);
-
-      if (!quizPartId) {
-        gradebook.push({
-          moduleNumber: module.number,
-          moduleTitle: module.title,
-          moduleWeight: module.weight ?? null,
-          hasQuiz: false,
-          attempted: false,
-          totalQuestions: 0,
-          correctAnswers: 0,
-          score: null,
-          passed: null,
-          coinsAwarded: 0,
-          submittedAt: null,
-        });
-        continue;
-      }
-
-      const questions = questionsByPartId.get(quizPartId) ?? [];
-      const numQuestions = questions.length;
-
-      if (numQuestions === 0) {
-        gradebook.push({
-          moduleNumber: module.number,
-          moduleTitle: module.title,
-          moduleWeight: module.weight ?? null,
-          hasQuiz: false,
-          attempted: false,
-          totalQuestions: 0,
-          correctAnswers: 0,
-          score: null,
-          passed: null,
-          coinsAwarded: 0,
-          submittedAt: null,
-        });
-        continue;
-      }
-
-      const studentAnswer = answersResult.rows.find(
-        (a) => a.module_number === module.number,
-      );
-
-      if (!studentAnswer) {
-        gradebook.push({
-          moduleNumber: module.number,
-          moduleTitle: module.title,
-          moduleWeight: module.weight ?? null,
-          hasQuiz: true,
-          attempted: false,
-          totalQuestions: numQuestions,
-          correctAnswers: 0,
-          score: 0,
-          passed: false,
-          coinsAwarded: 0,
-          submittedAt: null,
-        });
-        totalQuestions += numQuestions;
-        continue;
-      }
-
-      const studentAnswers = studentAnswer.answers;
-      let correct = 0;
-
-      questions.forEach((q, index) => {
-        const qd = q.question_data;
-        const studentAns = studentAnswers[String(index)];
-        if (isAnswerCorrect(qd, studentAns)) correct++;
-      });
-
-      const score = Math.round((correct / numQuestions) * 100);
-      const passed = score >= 75;
-
-      totalQuestions += numQuestions;
-      totalCorrect += correct;
-
-      gradebook.push({
-        moduleNumber: module.number,
-        moduleTitle: module.title,
-        moduleWeight: module.weight ?? null,
-        hasQuiz: true,
-        attempted: true,
-        totalQuestions: numQuestions,
-        correctAnswers: correct,
-        score,
-        passed,
-        coinsAwarded: studentAnswer.coins_awarded ?? 0,
-        submittedAt: studentAnswer.submitted_at ?? null,
-      });
-    }
-
-    // Calculate weighted overall score
-    const attemptedModules = gradebook.filter((m) => m.hasQuiz && m.attempted);
-
-    let weightedScore = 0;
-
-    if (attemptedModules.length > 0) {
-      const explicitWeightModules = gradebook.filter(
-        (m) => m.moduleWeight !== null,
-      );
-      const nullWeightModules = gradebook.filter(
-        (m) => m.moduleWeight === null && m.hasQuiz,
-      );
-
-      const explicitWeightSum = explicitWeightModules.reduce(
-        (sum, m) => sum + (m.moduleWeight ?? 0),
-        0,
-      );
-      const remainingWeight = 100 - explicitWeightSum;
-      const equalShare =
-        nullWeightModules.length > 0
-          ? remainingWeight / nullWeightModules.length
-          : 0;
-
-      const effectiveWeights: Record<number, number> = {};
-      for (const m of gradebook) {
-        if (m.moduleWeight !== null) {
-          effectiveWeights[m.moduleNumber] = m.moduleWeight;
-        } else if (m.hasQuiz) {
-          effectiveWeights[m.moduleNumber] = equalShare;
-        } else {
-          effectiveWeights[m.moduleNumber] = 0;
-        }
-      }
-
-      const attemptedWeightSum = attemptedModules.reduce(
-        (sum, m) => sum + (effectiveWeights[m.moduleNumber] ?? 0),
-        0,
-      );
-
-      if (attemptedWeightSum > 0) {
-        weightedScore = attemptedModules.reduce((sum, m) => {
-          const w = effectiveWeights[m.moduleNumber] ?? 0;
-          return sum + ((m.score ?? 0) / 100) * w;
-        }, 0);
-
-        weightedScore = (weightedScore / attemptedWeightSum) * 100;
-      }
-
-      for (const entry of gradebook) {
-        (entry as any).effectiveWeight =
-          effectiveWeights[entry.moduleNumber] ?? 0;
-      }
-    }
-
-    const overallScore = Math.round(weightedScore);
 
     res.status(200).json({
       success: true,
@@ -938,7 +986,7 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
         },
         courseId: Number(courseId),
         overallScore,
-        overallPassed: overallScore >= 75,
+        overallPassed,
         totalQuestions,
         totalCorrect,
         modules: gradebook,
@@ -946,6 +994,124 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
     });
   } catch (err) {
     console.error("getStudentGradebook error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// ── Get Gradebook for an entire Center (class-wide "Gradebook" view — one
+// row per student, one column per module — as distinct from the per-student
+// "grade standing" drill-down above)
+export const getCenterGradebook = async (req: AuthRequest, res: Response) => {
+  try {
+    const { centerId } = req.params;
+    const { courseId } = req.query;
+
+    if (isNaN(Number(centerId))) {
+      res.status(400).json({ success: false, message: "Invalid center ID." });
+      return;
+    }
+    if (!courseId || isNaN(Number(courseId))) {
+      res
+        .status(400)
+        .json({ success: false, message: "Valid courseId is required." });
+      return;
+    }
+
+    const center = await pool.query(`SELECT id FROM centers WHERE id = $1`, [
+      centerId,
+    ]);
+    if (center.rows.length === 0) {
+      res.status(404).json({ success: false, message: "Center not found." });
+      return;
+    }
+
+    if (req.user!.role === "facilitator") {
+      const assigned = await pool.query(
+        `SELECT id FROM center_facilitators WHERE center_id = $1 AND facilitator_id = $2`,
+        [centerId, req.user!.id],
+      );
+      if (assigned.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message: "You are not assigned to this center.",
+        });
+        return;
+      }
+    }
+
+    const studentsResult = await pool.query(
+      `SELECT s.id, s.id_number, s.first_name, s.last_name
+       FROM students s
+       INNER JOIN student_centers sc ON sc.student_id = s.id
+       WHERE sc.center_id = $1 AND sc.is_current = TRUE
+       ORDER BY s.last_name ASC, s.first_name ASC`,
+      [centerId],
+    );
+
+    const modulesResult = await pool.query(
+      `SELECT id, number, title, weight FROM course_modules
+   WHERE course_id = $1 ORDER BY number ASC`,
+      [courseId],
+    );
+
+    const moduleIds = modulesResult.rows.map((m) => m.id);
+    const { quizPartByModuleId, questionsByPartId } =
+      await batchFetchQuizData(moduleIds);
+
+    const studentIds = studentsResult.rows.map((s) => s.id);
+
+    const answersResult =
+      studentIds.length > 0
+        ? await pool.query(
+            `SELECT student_id, module_number, answers, coins_awarded, updated_at AS submitted_at
+       FROM student_quiz_answers
+       WHERE student_id = ANY($1) AND course_id = $2`,
+            [studentIds, courseId],
+          )
+        : { rows: [] };
+
+    const answersByStudentId = new Map<number, StudentAnswerRow[]>();
+    for (const row of answersResult.rows) {
+      if (!answersByStudentId.has(row.student_id)) {
+        answersByStudentId.set(row.student_id, []);
+      }
+      answersByStudentId.get(row.student_id)!.push(row);
+    }
+
+    const students = studentsResult.rows.map((s) => {
+      const { modules, overallScore, overallPassed } = buildStudentGradebook(
+        modulesResult.rows,
+        quizPartByModuleId,
+        questionsByPartId,
+        answersByStudentId.get(s.id) ?? [],
+      );
+
+      return {
+        studentId: s.id,
+        idNumber: s.id_number,
+        firstName: s.first_name,
+        lastName: s.last_name,
+        modules,
+        overallScore,
+        overallPassed,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        centerId: Number(centerId),
+        courseId: Number(courseId),
+        modules: modulesResult.rows.map((m) => ({
+          moduleNumber: m.number,
+          moduleTitle: m.title,
+          moduleWeight: m.weight ?? null,
+        })),
+        students,
+      },
+    });
+  } catch (err) {
+    console.error("getCenterGradebook error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };

@@ -263,9 +263,59 @@ export interface PersonalInfoProps {
 }
 
 export type BankQuestion = Omit<QuizQuestion, "bankQuestionId"> & {
-  courseId: number | null;
+  collectionId: number;
   createdById: number;
   createdByRole: "admin" | "facilitator";
   createdAt: string;
   updatedAt: string;
 };
+
+export type QuizBankCollection = {
+  id: number;
+  name: string;
+  description: string | null;
+  questionCount: number;
+  createdById: number | null;
+  createdByRole: "admin" | "facilitator" | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ─── Center Gradebook (class-wide, one row per student) ────────
+export interface CenterGradebookModuleResult {
+  moduleNumber: number;
+  moduleTitle: string;
+  moduleWeight: number | null;
+  hasQuiz: boolean;
+  attempted: boolean;
+  totalQuestions: number;
+  correctAnswers: number;
+  score: number | null;
+  passed: boolean | null;
+  coinsAwarded: number;
+  submittedAt: string | null;
+  effectiveWeight?: number;
+}
+
+export interface CenterGradebookModule {
+  moduleNumber: number;
+  moduleTitle: string;
+  moduleWeight: number | null;
+}
+
+export interface CenterGradebookStudent {
+  studentId: number;
+  idNumber: string;
+  firstName: string;
+  lastName: string;
+  modules: CenterGradebookModuleResult[];
+  overallScore: number;
+  overallPassed: boolean;
+}
+
+export interface CenterGradebookState {
+  centerId: number;
+  courseId: number;
+  modules: CenterGradebookModule[];
+  students: CenterGradebookStudent[];
+}

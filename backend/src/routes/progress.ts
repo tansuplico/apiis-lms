@@ -8,6 +8,7 @@ import {
   saveQuizAnswers,
   purchaseAccessory,
   getStudentGradebook,
+  getCenterGradebook,
 } from "../controllers/progressController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -56,6 +57,14 @@ router.get(
   authenticate,
   authorize("admin", "facilitator"),
   getStudentGradebook,
+);
+
+// ── Class-wide gradebook for an entire center (admin/facilitator)
+router.get(
+  "/center/:centerId/gradebook",
+  authenticate,
+  authorize("admin", "facilitator"),
+  getCenterGradebook,
 );
 
 export default router;

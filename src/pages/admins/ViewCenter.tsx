@@ -10,6 +10,7 @@ import {
   UserCheck,
   UserPlus,
   UserMinus,
+  ClipboardList,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -29,6 +30,7 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import ProgressTab from "@/components/shared/ProgressTab";
 import { useFacilitatorListStore } from "@/stores/useFacilitatorListStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import CenterGradebookOverview from "@/components/shared/CenterGradebookOverview";
 
 export default function ViewCenter() {
   // ── Store
@@ -68,10 +70,11 @@ export default function ViewCenter() {
       | "courses"
       | "students"
       | "progress"
+      | "gradebook"
       | "facilitators") ?? "courses";
 
   const setActiveTab = (
-    tab: "courses" | "students" | "progress" | "facilitators",
+    tab: "courses" | "students" | "progress" | "gradebook" | "facilitators",
   ) => {
     setSearchParams({ tab });
   };
@@ -250,6 +253,17 @@ export default function ViewCenter() {
           Progress
         </button>
         <button
+          onClick={() => setActiveTab("gradebook")}
+          className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+            activeTab === "gradebook"
+              ? "border-b-4 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer"
+          }`}
+        >
+          <ClipboardList size={20} />
+          Gradebook
+        </button>
+        <button
           onClick={() => setActiveTab("facilitators")}
           className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
             activeTab === "facilitators"
@@ -373,6 +387,13 @@ export default function ViewCenter() {
       {/* Progress Tab */}
       {activeTab === "progress" && (
         <ProgressTab centerStudents={centerStudents} courses={centerCourses} />
+      )}
+
+      {activeTab === "gradebook" && currentCenter && (
+        <CenterGradebookOverview
+          centerId={currentCenter.id}
+          courses={centerCourses}
+        />
       )}
 
       {/* Facilitators Tab */}

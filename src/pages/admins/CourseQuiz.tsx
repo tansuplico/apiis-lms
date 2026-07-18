@@ -8,18 +8,21 @@ import {
   X,
   Library,
   Lock,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import {
   BankQuestion,
   Course,
+  QuizBankCollection,
   QuizQuestion,
   QuizQuestionType,
 } from "@/types/types";
 import { tokenStorage } from "@/services/tokenStorage";
 
 import { questionBankService } from "@/services/questionBankService";
+import { quizBankCollectionService } from "@/services/bankCollectionService";
 
 // ── Types
 interface CourseQuizProps {
@@ -83,13 +86,52 @@ export default function CourseQuiz({
 
   const [promotingIds, setPromotingIds] = useState<Set<number>>(new Set());
 
-  const promoteToBank = async (q: QuizQuestion) => {
-    if (!setQuizQuestions) return;
+  // ── Collections (shared by the "Add from Bank" browser and the
+  // "promote to bank" collection-choice prompt below)
+  const [bankCollections, setBankCollections] = useState<QuizBankCollection[]>(
+    [],
+  );
+  const [bankCollectionsLoading, setBankCollectionsLoading] = useState(false);
+
+  const loadBankCollections = async () => {
+    setBankCollectionsLoading(true);
+    try {
+      const data = await quizBankCollectionService.getAll();
+      setBankCollections(data);
+    } catch {
+      toast.error("Failed to load collections.");
+    } finally {
+      setBankCollectionsLoading(false);
+    }
+  };
+
+  // ── Promote a locally-created question into the bank
+  const [promotingQuestion, setPromotingQuestion] =
+    useState<QuizQuestion | null>(null);
+  const [promoteCollectionId, setPromoteCollectionId] = useState<number | "">(
+    "",
+  );
+
+  const startPromoteToBank = (q: QuizQuestion) => {
+    setPromotingQuestion(q);
+    setPromoteCollectionId("");
+    loadBankCollections();
+  };
+
+  const cancelPromoteToBank = () => setPromotingQuestion(null);
+
+  const confirmPromoteToBank = async () => {
+    if (!promotingQuestion || !setQuizQuestions) return;
+    if (!promoteCollectionId) {
+      toast.warning("Choose a collection first.");
+      return;
+    }
+    const q = promotingQuestion;
     setPromotingIds((prev) => new Set(prev).add(q.id));
     try {
       const created = await questionBankService.create({
         ...q,
-        courseId: course.id,
+        collectionId: promoteCollectionId,
       });
       setQuizQuestions((prev) =>
         prev.map((qq) =>
@@ -99,6 +141,7 @@ export default function CourseQuiz({
         ),
       );
       toast.success("Added to the question bank.");
+      setPromotingQuestion(null);
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -114,29 +157,52 @@ export default function CourseQuiz({
     }
   };
 
-  // ── Question bank picker
+  // ── Question bank picker (browse a collection, add questions from it)
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
+  const [activeBankCollection, setActiveBankCollection] =
+    useState<QuizBankCollection | null>(null);
   const [bankQuestions, setBankQuestions] = useState<BankQuestion[]>([]);
-  const [bankLoading, setBankLoading] = useState(false);
+  const [bankQuestionsLoading, setBankQuestionsLoading] = useState(false);
   const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(
     new Set(),
   );
 
-  const openBankPicker = async () => {
+  const openBankPicker = () => {
     setBankPickerOpen(true);
+    setActiveBankCollection(null);
+    setBankQuestions([]);
     setSelectedBankIds(new Set());
-    setBankLoading(true);
+    loadBankCollections();
+  };
+
+  const closeBankPicker = () => {
+    setBankPickerOpen(false);
+    setActiveBankCollection(null);
+    setBankQuestions([]);
+    setSelectedBankIds(new Set());
+  };
+
+  const selectBankCollection = async (c: QuizBankCollection) => {
+    setActiveBankCollection(c);
+    setSelectedBankIds(new Set());
+    setBankQuestionsLoading(true);
     try {
-      const data = await questionBankService.getAll();
+      const data = await questionBankService.getAll(c.id);
       const alreadyAdded = new Set(
         questions.filter((q) => q.bankQuestionId).map((q) => q.bankQuestionId),
       );
       setBankQuestions(data.filter((bq) => !alreadyAdded.has(bq.id)));
     } catch {
-      toast.error("Failed to load the question bank.");
+      toast.error("Failed to load questions in this collection.");
     } finally {
-      setBankLoading(false);
+      setBankQuestionsLoading(false);
     }
+  };
+
+  const backToBankCollections = () => {
+    setActiveBankCollection(null);
+    setBankQuestions([]);
+    setSelectedBankIds(new Set());
   };
 
   const toggleBankSelection = (id: number) => {
@@ -158,7 +224,7 @@ export default function CourseQuiz({
         bankQuestionId: bq.id,
       }));
     setQuizQuestions((prev) => [...prev, ...toAdd]);
-    setBankPickerOpen(false);
+    closeBankPicker();
   };
 
   // ── Edit state
@@ -374,14 +440,6 @@ export default function CourseQuiz({
                           </span>
                         </div>
                         <button
-                          onClick={() => promoteToBank(q)}
-                          disabled={promotingIds.has(q.id)}
-                          title="Add this question to the reusable question bank"
-                          className="p-1 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded disabled:opacity-50"
-                        >
-                          <Library size={16} />
-                        </button>
-                        <button
                           onClick={() => removeQuestion(q.id)}
                           className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                           title="Remove from this quiz (doesn't delete it from the bank)"
@@ -435,6 +493,14 @@ export default function CourseQuiz({
                             ),
                           )}
                         </select>
+                        <button
+                          onClick={() => startPromoteToBank(q)}
+                          disabled={promotingIds.has(q.id)}
+                          title="Add this question to the reusable question bank"
+                          className="p-1 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded disabled:opacity-50"
+                        >
+                          <Library size={16} />
+                        </button>
                         <button
                           onClick={() => removeQuestion(q.id)}
                           className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
@@ -1131,24 +1197,69 @@ export default function CourseQuiz({
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-lg w-full shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                Add from Question Bank
-              </h2>
+              <div className="flex items-center gap-2 min-w-0">
+                {activeBankCollection && (
+                  <button
+                    onClick={backToBankCollections}
+                    className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
+                    title="Back to collections"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                )}
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                  {activeBankCollection
+                    ? activeBankCollection.name
+                    : "Add from Question Bank"}
+                </h2>
+              </div>
               <button
-                onClick={() => setBankPickerOpen(false)}
-                className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                onClick={closeBankPicker}
+                className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-              {bankLoading ? (
+              {!activeBankCollection ? (
+                bankCollectionsLoading ? (
+                  <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+                ) : bankCollections.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No collections yet. Create one from the Question Bank page
+                    first.
+                  </p>
+                ) : (
+                  bankCollections.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => selectBankCollection(c)}
+                      className="w-full flex items-center justify-between gap-3 p-3 border rounded-lg text-left border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                          {c.name}
+                        </p>
+                        {c.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {c.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                        {c.questionCount} question
+                        {c.questionCount === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                  ))
+                )
+              ) : bankQuestionsLoading ? (
                 <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               ) : bankQuestions.length === 0 ? (
                 <p className="text-gray-500 dark:text-gray-400">
-                  The question bank is empty. Add questions to it from the
-                  Question Bank page first.
+                  No questions available to add from this collection (they may
+                  already be in this quiz).
                 </p>
               ) : (
                 bankQuestions.map((bq) => (
@@ -1181,17 +1292,86 @@ export default function CourseQuiz({
 
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setBankPickerOpen(false)}
+                onClick={closeBankPicker}
+                className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              {activeBankCollection && (
+                <button
+                  onClick={addSelectedBankQuestions}
+                  disabled={selectedBankIds.size === 0}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+                >
+                  Add Selected
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promotingQuestion && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                Add to Question Bank
+              </h2>
+              <button
+                onClick={cancelPromoteToBank}
+                className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Collection
+            </label>
+            {bankCollectionsLoading ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Loading...
+              </p>
+            ) : bankCollections.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                No collections yet. Create one from the Question Bank page
+                first.
+              </p>
+            ) : (
+              <select
+                value={promoteCollectionId}
+                onChange={(e) =>
+                  setPromoteCollectionId(
+                    e.target.value ? Number(e.target.value) : "",
+                  )
+                }
+                className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option value="">Choose a collection…</option>
+                {bankCollections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={cancelPromoteToBank}
                 className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
-                onClick={addSelectedBankQuestions}
-                disabled={selectedBankIds.size === 0}
+                onClick={confirmPromoteToBank}
+                disabled={
+                  !promoteCollectionId || promotingIds.has(promotingQuestion.id)
+                }
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
               >
-                Add Selected
+                Add
               </button>
             </div>
           </div>

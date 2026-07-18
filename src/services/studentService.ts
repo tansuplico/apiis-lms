@@ -5,6 +5,7 @@ import {
   AccountStatus,
   CourseProgress,
   GradebookState,
+  CenterGradebookState,
 } from "@/types/types";
 
 interface StudentProgressResponse {
@@ -179,6 +180,16 @@ export const studentService = {
   ): Promise<GradebookState> => {
     const response = await apiClient.get<GradebookState>(
       `/progress/${studentId}/gradebook?courseId=${courseId}`,
+    );
+    return response.data!;
+  },
+
+  getCenterGradebook: async (
+    centerId: number,
+    courseId: number,
+  ): Promise<CenterGradebookState> => {
+    const response = await apiClient.get<CenterGradebookState>(
+      `/progress/center/${centerId}/gradebook?courseId=${courseId}`,
     );
     return response.data!;
   },
