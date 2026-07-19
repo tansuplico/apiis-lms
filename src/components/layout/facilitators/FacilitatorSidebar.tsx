@@ -6,6 +6,7 @@ import {
   Settings,
   Rows4,
   Users,
+  Library,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
@@ -122,6 +123,25 @@ export default function FacilitatorSidebar() {
                   className="text-gray-600 dark:text-gray-400"
                 />
                 <span>Attendance</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/facilitator/question-bank"
+                className={({ isActive }) =>
+                  `flex items-center gap-4 px-5 py-3.5 rounded-lg text-base font-medium ${
+                    isActive
+                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`
+                }
+              >
+                <Library
+                  size={26}
+                  strokeWidth={1.6}
+                  className="text-gray-600 dark:text-gray-400"
+                />
+                <span>Question Bank</span>
               </NavLink>
             </li>
           </ul>

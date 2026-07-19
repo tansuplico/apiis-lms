@@ -7,9 +7,14 @@ import {
   Pencil,
   Image as ImageIcon,
   X,
-  ArrowLeft,
   LayoutGrid,
   List as ListIcon,
+  ListChecks,
+  PenLine,
+  TextCursorInput,
+  ToggleLeft,
+  ArrowLeftRight,
+  Check,
 } from "lucide-react";
 import {
   BankQuestion,
@@ -29,6 +34,14 @@ const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   fill_in_the_blank: "Fill in the Blank",
   true_false: "True / False",
   matching: "Matching",
+};
+
+const QUESTION_TYPE_ICONS: Record<QuizQuestionType, typeof ListChecks> = {
+  multiple_choice: ListChecks,
+  identification: PenLine,
+  fill_in_the_blank: TextCursorInput,
+  true_false: ToggleLeft,
+  matching: ArrowLeftRight,
 };
 
 // Deterministic per-collection accent, keyed by id (not name) so renaming
@@ -102,6 +115,9 @@ export default function QuestionBank() {
     emptyDraft("multiple_choice", 0),
   );
   const [saving, setSaving] = useState(false);
+  // Only show field-level error highlighting after a failed save attempt,
+  // not while the person is still filling the form in for the first time.
+  const [attemptedSave, setAttemptedSave] = useState(false);
 
   const [collectionModalMode, setCollectionModalMode] = useState<
     "new" | QuizBankCollection | null
@@ -216,6 +232,7 @@ export default function QuestionBank() {
   const startCreate = () => {
     if (!activeCollection) return;
     setDraft(emptyDraft("multiple_choice", activeCollection.id));
+    setAttemptedSave(false);
     setEditingId("new");
   };
 
@@ -233,10 +250,21 @@ export default function QuestionBank() {
       explanation: q.explanation,
       collectionId: q.collectionId,
     });
+    setAttemptedSave(false);
     setEditingId(q.id);
   };
 
   const cancelEdit = () => setEditingId(null);
+
+  useEffect(() => {
+    if (editingId === null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelEdit();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
 
   const changeType = (type: QuizQuestionType) => {
     setDraft((prev) => ({
@@ -246,6 +274,56 @@ export default function QuestionBank() {
       imageUrl: prev.imageUrl,
     }));
   };
+
+  // Mirrors backend/src/utils/quizQuestions.ts validateQuestionShape() so
+  // the person sees the problem immediately instead of after a round trip.
+  const MAX_QUIZ_OPTIONS = 6;
+  const MAX_MATCHING_PAIRS = 6;
+  const MAX_IDENTIFICATION_ANSWERS = 10;
+
+  const validateDraft = (): string | null => {
+    if (!draft.question.trim()) return "Enter the question text first.";
+
+    if (draft.type === "multiple_choice") {
+      const opts = draft.options ?? [];
+      if (opts.length < 2) return "Add at least 2 options.";
+      if (opts.some((o) => !o.trim()))
+        return "Fill in every option, or remove the empty ones.";
+    } else if (draft.type === "identification") {
+      const answers = draft.correctAnswers ?? [];
+      if (answers.length < 1 || answers.some((a) => !a.trim()))
+        return "Fill in every accepted answer, or remove the empty ones.";
+    } else if (draft.type === "matching") {
+      const pairs = draft.matchingPairs ?? [];
+      if (pairs.length < 2) return "Add at least 2 matching pairs.";
+      if (pairs.some((p) => !p.left.trim() || !p.right.trim()))
+        return "Fill in both sides of every matching pair.";
+    } else if (draft.type === "fill_in_the_blank") {
+      if (!draft.correctAnswer?.trim()) return "Enter the correct answer.";
+      if (!draft.question.includes("___"))
+        return 'Use "___" in the question text to mark the blank.';
+    }
+    return null;
+  };
+
+  const addOption = () =>
+    setDraft((prev) => ({
+      ...prev,
+      options: [...(prev.options ?? []), ""],
+    }));
+
+  const removeOption = (idx: number) =>
+    setDraft((prev) => {
+      const options = (prev.options ?? []).filter((_, i) => i !== idx);
+      const prevCorrect = prev.correctOptionIndex ?? 0;
+      const correctOptionIndex =
+        prevCorrect === idx
+          ? 0
+          : prevCorrect > idx
+            ? prevCorrect - 1
+            : prevCorrect;
+      return { ...prev, options, correctOptionIndex };
+    });
 
   const handleImageUpload = async (file: File) => {
     if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
@@ -275,8 +353,10 @@ export default function QuestionBank() {
   };
 
   const save = async () => {
-    if (!draft.question.trim()) {
-      toast.warning("Enter the question text first.");
+    const error = validateDraft();
+    if (error) {
+      setAttemptedSave(true);
+      toast.warning(error);
       return;
     }
     setSaving(true);
@@ -565,7 +645,6 @@ export default function QuestionBank() {
 
   return (
     <div className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 pb-10">
-
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h3 className="text-4xl text-gray-900 dark:text-white">
@@ -640,9 +719,15 @@ export default function QuestionBank() {
       )}
 
       {editingId !== null && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={cancelEdit}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-gray-800 rounded-xl max-w-xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {editingId === "new" ? "Add Question" : "Edit Question"}
               </h2>
@@ -654,297 +739,382 @@ export default function QuestionBank() {
               </button>
             </div>
 
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Question Type
-            </label>
-            <select
-              value={draft.type}
-              onChange={(e) => changeType(e.target.value as QuizQuestionType)}
-              className="w-full p-2 border rounded mb-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
-                (t) => (
-                  <option key={t} value={t}>
-                    {QUESTION_TYPE_LABELS[t]}
-                  </option>
-                ),
-              )}
-            </select>
-
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Question Text
-            </label>
-            <input
-              type="text"
-              value={draft.question}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, question: e.target.value }))
-              }
-              className="w-full p-2 border rounded mb-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder={
-                draft.type === "fill_in_the_blank"
-                  ? 'e.g. "The capital of France is ___."'
-                  : "Enter question..."
-              }
-            />
-            {draft.type === "fill_in_the_blank" && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 -mt-2">
-                Use{" "}
-                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
-                  ___
-                </code>{" "}
-                to mark where the blank should appear.
-              </p>
-            )}
-
-            <div className="mb-3">
-              {draft.imageUrl ? (
-                <div className="relative inline-block">
-                  <img
-                    src={draft.imageUrl}
-                    alt="Question"
-                    className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
-                  />
-                  <button
-                    onClick={() =>
-                      setDraft((prev) => ({ ...prev, imageUrl: undefined }))
-                    }
-                    className="absolute -top-2 -right-2 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <ImageIcon size={16} />
-                  Add image (optional)
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              )}
-            </div>
-
-            {draft.type === "multiple_choice" && (
-              <div className="space-y-2 mb-3">
-                {(draft.options ?? []).map((opt, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={draft.correctOptionIndex === idx}
-                      onChange={() =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          correctOptionIndex: idx,
-                        }))
-                      }
-                    />
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) =>
-                        setDraft((prev) => {
-                          const next = [...(prev.options ?? [])];
-                          next[idx] = e.target.value;
-                          return { ...prev, options: next };
-                        })
-                      }
-                      className="flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder={`Option ${idx + 1}`}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {draft.type === "identification" && (
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Accepted Answers
-                </label>
-                {(draft.correctAnswers ?? [""]).map((ans, idx) => (
-                  <div key={idx} className="flex items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={ans}
-                      onChange={(e) =>
-                        setDraft((prev) => {
-                          const next = [...(prev.correctAnswers ?? [""])];
-                          next[idx] = e.target.value;
-                          return { ...prev, correctAnswers: next };
-                        })
-                      }
-                      className="flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder={
-                        idx === 0 ? "e.g. Paris" : "Another accepted answer"
-                      }
-                    />
-                    {(draft.correctAnswers?.length ?? 1) > 1 && (
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                Question Type
+              </label>
+              <div className="grid grid-cols-5 gap-1.5 mb-4">
+                {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
+                  (t) => {
+                    const Icon = QUESTION_TYPE_ICONS[t];
+                    const active = draft.type === t;
+                    return (
                       <button
-                        onClick={() =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            correctAnswers: (prev.correctAnswers ?? []).filter(
-                              (_, i) => i !== idx,
-                            ),
-                          }))
-                        }
-                        className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                        key={t}
+                        type="button"
+                        onClick={() => changeType(t)}
+                        title={QUESTION_TYPE_LABELS[t]}
+                        className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg border text-center leading-tight ${
+                          active
+                            ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300"
+                            : "border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
                       >
-                        <Trash2 size={14} />
+                        <Icon size={16} />
+                        <span className="text-[10px] font-medium">
+                          {QUESTION_TYPE_LABELS[t]}
+                        </span>
                       </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  onClick={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      correctAnswers: [...(prev.correctAnswers ?? [""]), ""],
-                    }))
-                  }
-                  className="text-xs text-blue-600 hover:underline"
+                    );
+                  },
+                )}
+              </div>
+
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                Question Text
+              </label>
+              <input
+                type="text"
+                value={draft.question}
+                onChange={(e) =>
+                  setDraft((prev) => ({ ...prev, question: e.target.value }))
+                }
+                className={`w-full p-2 border rounded mb-1 dark:bg-gray-700 dark:text-white ${
+                  attemptedSave && !draft.question.trim()
+                    ? "border-red-400 dark:border-red-500"
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+                placeholder={
+                  draft.type === "fill_in_the_blank"
+                    ? 'e.g. "The capital of France is ___."'
+                    : "Enter question..."
+                }
+              />
+              {draft.type === "fill_in_the_blank" && (
+                <p
+                  className={`text-xs mb-3 ${
+                    attemptedSave &&
+                    draft.question.trim() &&
+                    !draft.question.includes("___")
+                      ? "text-red-500 dark:text-red-400"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
                 >
-                  + Add another accepted answer
-                </button>
-              </div>
-            )}
+                  Use{" "}
+                  <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                    ___
+                  </code>{" "}
+                  to mark where the blank should appear.
+                </p>
+              )}
 
-            {draft.type === "fill_in_the_blank" && (
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Correct Answer
-                </label>
-                <input
-                  type="text"
-                  value={draft.correctAnswer ?? ""}
-                  onChange={(e) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      correctAnswer: e.target.value,
-                    }))
-                  }
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="e.g. Paris (exact answer, case insensitive)"
-                />
+              <div className="mb-4">
+                {draft.imageUrl ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={draft.imageUrl}
+                      alt="Question"
+                      className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
+                    />
+                    <button
+                      onClick={() =>
+                        setDraft((prev) => ({ ...prev, imageUrl: undefined }))
+                      }
+                      className="absolute -top-2 -right-2 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <ImageIcon size={16} />
+                    Add image (optional)
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </div>
-            )}
 
-            {draft.type === "true_false" && (
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Correct Answer
-                </label>
-                <div className="flex gap-4">
-                  {[true, false].map((val) => (
-                    <label
-                      key={String(val)}
-                      className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
+                Answer
+              </p>
+
+              {draft.type === "multiple_choice" && (
+                <div className="space-y-2 mb-1">
+                  {(draft.options ?? []).map((opt, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center gap-2 p-1.5 rounded-lg border ${
+                        draft.correctOptionIndex === idx
+                          ? "border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700"
+                          : "border-transparent"
+                      }`}
                     >
                       <input
                         type="radio"
-                        checked={(draft.correctBoolean ?? true) === val}
+                        checked={draft.correctOptionIndex === idx}
                         onChange={() =>
-                          setDraft((prev) => ({ ...prev, correctBoolean: val }))
+                          setDraft((prev) => ({
+                            ...prev,
+                            correctOptionIndex: idx,
+                          }))
+                        }
+                        className="shrink-0 accent-green-600"
+                        title="Mark as correct"
+                      />
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            const next = [...(prev.options ?? [])];
+                            next[idx] = e.target.value;
+                            return { ...prev, options: next };
+                          })
+                        }
+                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                          attemptedSave && !opt.trim()
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                        placeholder={`Option ${idx + 1}`}
+                      />
+                      {(draft.options?.length ?? 0) > 2 && (
+                        <button
+                          onClick={() => removeOption(idx)}
+                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {(draft.options?.length ?? 0) < MAX_QUIZ_OPTIONS && (
+                    <button
+                      onClick={addOption}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      + Add option
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                    Select the radio button next to the correct option.
+                  </p>
+                </div>
+              )}
+
+              {draft.type === "identification" && (
+                <div className="mb-1">
+                  {(draft.correctAnswers ?? [""]).map((ans, idx) => (
+                    <div key={idx} className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={ans}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            const next = [...(prev.correctAnswers ?? [""])];
+                            next[idx] = e.target.value;
+                            return { ...prev, correctAnswers: next };
+                          })
+                        }
+                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                          attemptedSave && !ans.trim()
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                        placeholder={
+                          idx === 0 ? "e.g. Paris" : "Another accepted answer"
                         }
                       />
-                      {val ? "True" : "False"}
-                    </label>
+                      {(draft.correctAnswers?.length ?? 1) > 1 && (
+                        <button
+                          onClick={() =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              correctAnswers: (
+                                prev.correctAnswers ?? []
+                              ).filter((_, i) => i !== idx),
+                            }))
+                          }
+                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   ))}
+                  {(draft.correctAnswers?.length ?? 0) <
+                    MAX_IDENTIFICATION_ANSWERS && (
+                    <button
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          correctAnswers: [
+                            ...(prev.correctAnswers ?? [""]),
+                            "",
+                          ],
+                        }))
+                      }
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      + Add another accepted answer
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {draft.type === "matching" && (
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Matching Pairs
-                </label>
-                {(draft.matchingPairs ?? []).map((pair, idx) => (
-                  <div key={idx} className="flex items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={pair.left}
-                      onChange={(e) =>
-                        setDraft((prev) => {
-                          const next = [...(prev.matchingPairs ?? [])];
-                          next[idx] = { ...next[idx], left: e.target.value };
-                          return { ...prev, matchingPairs: next };
-                        })
-                      }
-                      className="flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Left item"
-                    />
-                    <span className="text-gray-400">→</span>
-                    <input
-                      type="text"
-                      value={pair.right}
-                      onChange={(e) =>
-                        setDraft((prev) => {
-                          const next = [...(prev.matchingPairs ?? [])];
-                          next[idx] = { ...next[idx], right: e.target.value };
-                          return { ...prev, matchingPairs: next };
-                        })
-                      }
-                      className="flex-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Matching item"
-                    />
-                    {(draft.matchingPairs?.length ?? 0) > 2 && (
+              {draft.type === "fill_in_the_blank" && (
+                <div className="mb-1">
+                  <input
+                    type="text"
+                    value={draft.correctAnswer ?? ""}
+                    onChange={(e) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        correctAnswer: e.target.value,
+                      }))
+                    }
+                    className={`w-full p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                      attemptedSave && !draft.correctAnswer?.trim()
+                        ? "border-red-400 dark:border-red-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder="e.g. Paris (exact answer, case insensitive)"
+                  />
+                </div>
+              )}
+
+              {draft.type === "true_false" && (
+                <div className="mb-1 flex gap-2">
+                  {[true, false].map((val) => {
+                    const active = (draft.correctBoolean ?? true) === val;
+                    return (
                       <button
+                        key={String(val)}
+                        type="button"
                         onClick={() =>
                           setDraft((prev) => ({
                             ...prev,
-                            matchingPairs: (prev.matchingPairs ?? []).filter(
-                              (_, i) => i !== idx,
-                            ),
+                            correctBoolean: val,
                           }))
                         }
-                        className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium flex items-center justify-center gap-1.5 ${
+                          active
+                            ? "border-green-300 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300"
+                            : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
                       >
-                        <Trash2 size={14} />
+                        {active && <Check size={14} />}
+                        {val ? "True" : "False"}
                       </button>
-                    )}
-                  </div>
-                ))}
-                {(draft.matchingPairs?.length ?? 0) < 6 && (
-                  <button
-                    onClick={() =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        matchingPairs: [
-                          ...(prev.matchingPairs ?? []),
-                          { left: "", right: "" },
-                        ],
-                      }))
-                    }
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    + Add another pair
-                  </button>
-                )}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
 
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Explanation (optional)
-            </label>
-            <textarea
-              value={draft.explanation ?? ""}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, explanation: e.target.value }))
-              }
-              className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              rows={2}
-            />
+              {draft.type === "matching" && (
+                <div className="mb-1">
+                  {(draft.matchingPairs ?? []).map((pair, idx) => (
+                    <div key={idx} className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={pair.left}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            const next = [...(prev.matchingPairs ?? [])];
+                            next[idx] = { ...next[idx], left: e.target.value };
+                            return { ...prev, matchingPairs: next };
+                          })
+                        }
+                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                          attemptedSave && !pair.left.trim()
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                        placeholder="Left item"
+                      />
+                      <span className="text-gray-400 shrink-0">→</span>
+                      <input
+                        type="text"
+                        value={pair.right}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            const next = [...(prev.matchingPairs ?? [])];
+                            next[idx] = {
+                              ...next[idx],
+                              right: e.target.value,
+                            };
+                            return { ...prev, matchingPairs: next };
+                          })
+                        }
+                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                          attemptedSave && !pair.right.trim()
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                        placeholder="Matching item"
+                      />
+                      {(draft.matchingPairs?.length ?? 0) > 2 && (
+                        <button
+                          onClick={() =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              matchingPairs: (prev.matchingPairs ?? []).filter(
+                                (_, i) => i !== idx,
+                              ),
+                            }))
+                          }
+                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {(draft.matchingPairs?.length ?? 0) < MAX_MATCHING_PAIRS && (
+                    <button
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          matchingPairs: [
+                            ...(prev.matchingPairs ?? []),
+                            { left: "", right: "" },
+                          ],
+                        }))
+                      }
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      + Add another pair
+                    </button>
+                  )}
+                </div>
+              )}
 
-            <div className="flex justify-end gap-2">
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 mt-4">
+                Explanation (optional)
+              </label>
+              <textarea
+                value={draft.explanation ?? ""}
+                onChange={(e) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    explanation: e.target.value,
+                  }))
+                }
+                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
               <button
                 onClick={cancelEdit}
                 className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"

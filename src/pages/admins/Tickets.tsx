@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import ViewTicketModal from "@/components/admins/tickets/ViewTicketModal";
-import { Ticket, TicketStatus } from "@/types/types";
+import { Ticket, TicketStatus, SenderRole } from "@/types/types";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import { isOnline, onNetworkChange } from "@/services/networkStatus";
 import { useTicketStore } from "@/stores/useTicketStore";
@@ -22,6 +22,9 @@ export default function AdminTickets() {
     useTicketStore();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<SenderRole | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,16 +41,40 @@ export default function AdminTickets() {
     return () => unsubscribe();
   }, []);
 
-  // ── Client-side search ───────────────────────────────────────────────────
+  // ── Categories actually present in the current ticket data, so the
+  // filter never drifts from what people have actually submitted.
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(tickets.map((t) => t.category))).sort(),
+    [tickets],
+  );
+
+  // ── Client-side search + filters ─────────────────────────────────────────
   const filteredTickets = useMemo(() => {
-    if (!searchTerm.trim()) return tickets;
-    const lower = searchTerm.toLowerCase().trim();
-    return tickets.filter(
-      (t) =>
-        t.subject.toLowerCase().includes(lower) ||
-        t.senderName.toLowerCase().includes(lower),
-    );
-  }, [searchTerm, tickets]);
+    let result = tickets;
+
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase().trim();
+      result = result.filter(
+        (t) =>
+          t.subject.toLowerCase().includes(lower) ||
+          t.senderName.toLowerCase().includes(lower),
+      );
+    }
+
+    if (statusFilter !== "all") {
+      result = result.filter((t) => t.status === statusFilter);
+    }
+
+    if (roleFilter !== "all") {
+      result = result.filter((t) => t.senderRole === roleFilter);
+    }
+
+    if (categoryFilter !== "all") {
+      result = result.filter((t) => t.category === categoryFilter);
+    }
+
+    return result;
+  }, [searchTerm, statusFilter, roleFilter, categoryFilter, tickets]);
 
   // ── Client-side pagination ───────────────────────────────────────────────
   const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE);
@@ -59,7 +86,7 @@ export default function AdminTickets() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter, roleFilter, categoryFilter]);
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -76,10 +103,9 @@ export default function AdminTickets() {
     setIsDeleting(true);
     try {
       await deleteTicket(ticketToDelete.id);
-      toast.success(
-        `Ticket #${String(ticketToDelete.id).padStart(5, "0")} deleted.`,
-        { position: "bottom-right" },
-      );
+      toast.success(`Ticket #${ticketToDelete.id} deleted.`, {
+        position: "bottom-right",
+      });
       setShowDeleteModal(false);
       setTicketToDelete(null);
     } catch (err: any) {
@@ -114,19 +140,59 @@ export default function AdminTickets() {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
           All Support Tickets
         </h1>
-        <div className="w-full sm:w-80 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
-          <Search size={20} className="text-gray-500 dark:text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by subject or sender..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          />
+        <div className="w-full lg:w-auto flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+            <Search size={20} className="text-gray-500 dark:text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by subject or sender..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as TicketStatus | "all")
+            }
+            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+          >
+            <option value="all">All statuses</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+
+          <select
+            value={roleFilter}
+            onChange={(e) =>
+              setRoleFilter(e.target.value as SenderRole | "all")
+            }
+            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+          >
+            <option value="all">All roles</option>
+            <option value="student">Student</option>
+            <option value="facilitator">Facilitator</option>
+          </select>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+          >
+            <option value="all">All categories</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -145,16 +211,19 @@ export default function AdminTickets() {
 
       {/* Table */}
       {!isLoading && (tickets.length > 0 || online) && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-center">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
-                  <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 w-28">
-                    Ticket ID
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 w-20">
+                    ID
                   </th>
-                  <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 w-56">
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 w-48">
                     Sender
+                  </th>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 w-32">
+                    Role
                   </th>
                   <th className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Subject
@@ -178,10 +247,15 @@ export default function AdminTickets() {
                   {paginatedTickets.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="text-center py-16 text-gray-500 dark:text-gray-400"
                       >
-                        No tickets found
+                        {searchTerm.trim() ||
+                        statusFilter !== "all" ||
+                        roleFilter !== "all" ||
+                        categoryFilter !== "all"
+                          ? "No tickets match your filters"
+                          : "No tickets found"}
                       </td>
                     </tr>
                   ) : (
@@ -191,17 +265,13 @@ export default function AdminTickets() {
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                       >
                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                          #{String(ticket.id).padStart(5, "0")}
+                          #{ticket.id}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {ticket.senderName}
-                            </span>
-                            <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                              {ticket.senderRole}
-                            </span>
-                          </div>
+                        <td className="px-6 py-4 font-medium">
+                          {ticket.senderName}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400 capitalize">
+                          {ticket.senderRole}
                         </td>
                         <td className="px-6 py-4 text-gray-700 dark:text-gray-300 max-w-xs">
                           <div className="line-clamp-1" title={ticket.subject}>
@@ -307,7 +377,7 @@ export default function AdminTickets() {
       {showDeleteModal && ticketToDelete && (
         <DeleteConfirmModal
           title="Delete Ticket?"
-          message={`Are you sure you want to permanently delete ticket #${String(ticketToDelete?.id).padStart(5, "0")} from`}
+          message={`Are you sure you want to permanently delete ticket #${ticketToDelete?.id} from`}
           itemName={ticketToDelete?.senderName || ""}
           onConfirm={confirmDelete}
           onCancel={() => {
