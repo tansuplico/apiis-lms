@@ -114,10 +114,11 @@ export const courseService = {
     partId: number,
     questions: QuizQuestion[],
     expectedUpdatedAt?: string,
+    showCorrectAnswers?: boolean,
   ): Promise<{ updatedAt?: string }> => {
     const response = await apiClient.put<{ updatedAt?: string }>(
       `/courses/${courseId}/modules/${moduleId}/parts/${partId}/quiz`,
-      { questions, expectedUpdatedAt },
+      { questions, expectedUpdatedAt, showCorrectAnswers },
     );
     return response.data ?? {};
   },

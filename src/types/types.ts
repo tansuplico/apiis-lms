@@ -100,8 +100,8 @@ export type CoursePart = {
   content?: string;
   order: number;
   updatedAt?: string;
+  showCorrectAnswers?: boolean;
 };
-
 export type ModuleVideo = {
   id: number;
   moduleId: number;

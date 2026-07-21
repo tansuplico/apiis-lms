@@ -1,7 +1,8 @@
 // src/pages/students/CourseQuiz.tsx
 import { useOutletContext } from "react-router-dom";
 import { Course, QuizQuestion, QuizQuestionType } from "@/types/types";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { shuffleArray } from "@/utils/shuffle";
 import {
   CheckCircle,
   XCircle,
@@ -94,6 +95,20 @@ export default function CourseQuiz() {
   const currentModule = course.modules.find((m) => m.number === modNum);
   const quizPart = currentModule?.parts.find((p) => p.slug === "quiz");
   const questions = quizPart?.quizQuestions ?? [];
+  // Defaults to true for parts saved before this setting existed.
+  const revealAnswers = quizPart?.showCorrectAnswers ?? true;
+
+  // Each student sees questions in a randomized order. Answers are keyed by
+  // question id (not position — see handleAnswerSelect below), so shuffling
+  // is purely cosmetic and never affects grading. The order is stable while
+  // answering (doesn't reshuffle on every re-render) but re-rolls whenever
+  // this quiz part changes or the student hits "Try Again" (shuffleSeed).
+  const [shuffleSeed, setShuffleSeed] = useState(0);
+  const shuffledQuestions = useMemo(
+    () => shuffleArray(questions),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [quizPart?.id, shuffleSeed],
+  );
 
   const alreadyCompleted =
     currentStudent?.courseProgress[course.id]?.completedParts.includes(
@@ -109,8 +124,8 @@ export default function CourseQuiz() {
   const savedAnswers =
     currentStudent?.courseProgress[course.id]?.quizAnswers?.[modNum] ?? {};
 
-  const restoredScore = questions.filter((q, idx) =>
-    isQuestionCorrect(q, savedAnswers[idx] as StudentAnswer),
+  const restoredScore = questions.filter((q) =>
+    isQuestionCorrect(q, savedAnswers[q.id] as StudentAnswer),
   ).length;
 
   const restoredCoins = (() => {
@@ -133,8 +148,8 @@ export default function CourseQuiz() {
 
   const allAnswered =
     questions.length > 0 &&
-    questions.every((q, idx) => {
-      const answer = studentAnswers[idx];
+    questions.every((q) => {
+      const answer = studentAnswers[q.id];
       if (q.type === "matching") {
         return (
           Array.isArray(answer) &&
@@ -158,23 +173,20 @@ export default function CourseQuiz() {
   }
 
   // ── Handlers
-  const isCorrectAnswer = (qIndex: number) => {
-    const q = questions[qIndex];
-    if (!q) return false;
-    return isQuestionCorrect(q, studentAnswers[qIndex]);
-  };
+  const isCorrectAnswer = (q: QuizQuestion) =>
+    isQuestionCorrect(q, studentAnswers[q.id]);
 
   const handleAnswerSelect = (
-    questionIndex: number,
+    questionId: number,
     value: number | string | boolean | string[],
   ) => {
     if (submitted) return;
-    setStudentAnswers((prev) => ({ ...prev, [questionIndex]: value }));
+    setStudentAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
   const handleSubmit = async () => {
-    const correctCount = questions.filter((q, idx) =>
-      isQuestionCorrect(q, studentAnswers[idx]),
+    const correctCount = questions.filter((q) =>
+      isQuestionCorrect(q, studentAnswers[q.id]),
     ).length;
 
     const coins = COIN_REWARDS_BY_DIFFICULTY[course.level] ?? 5;
@@ -202,6 +214,7 @@ export default function CourseQuiz() {
     setStudentAnswers({});
     setScore(0);
     setEarnedCoins(0);
+    setShuffleSeed((s) => s + 1);
   };
 
   const handleNext = () => {
@@ -242,10 +255,10 @@ export default function CourseQuiz() {
           </p>
         ) : (
           <div className="space-y-8">
-            {questions.map((q, idx) => {
+            {shuffledQuestions.map((q, idx) => {
               const type = q.type ?? "multiple_choice";
-              const studentAnswer = studentAnswers[idx];
-              const correct = isCorrectAnswer(idx);
+              const studentAnswer = studentAnswers[q.id];
+              const correct = isCorrectAnswer(q);
 
               return (
                 <div key={q.id}>
@@ -285,17 +298,22 @@ export default function CourseQuiz() {
                       {q.options?.map((opt, optIdx) => {
                         const isSelected = studentAnswer === optIdx;
                         const isCorrectOption = optIdx === q.correctOptionIndex;
+                        const showAsCorrect =
+                          submitted &&
+                          ((revealAnswers && isCorrectOption) ||
+                            (isSelected && isCorrectOption));
+                        const showAsWrongSelected =
+                          submitted && isSelected && !isCorrectOption;
 
                         let optionStyle =
                           "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
-                        if (submitted) {
-                          if (isCorrectOption)
-                            optionStyle =
-                              "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
-                          else if (isSelected && !isCorrectOption)
-                            optionStyle =
-                              "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
-                        } else if (isSelected) {
+                        if (showAsCorrect) {
+                          optionStyle =
+                            "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
+                        } else if (showAsWrongSelected) {
+                          optionStyle =
+                            "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
+                        } else if (!submitted && isSelected) {
                           optionStyle =
                             "border-blue-500 bg-blue-50 dark:bg-blue-900/30";
                         }
@@ -303,7 +321,7 @@ export default function CourseQuiz() {
                         return (
                           <li
                             key={optIdx}
-                            onClick={() => handleAnswerSelect(idx, optIdx)}
+                            onClick={() => handleAnswerSelect(q.id, optIdx)}
                             className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${optionStyle} ${
                               !submitted
                                 ? "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -312,20 +330,20 @@ export default function CourseQuiz() {
                           >
                             <input
                               type="radio"
-                              name={`q${idx}`}
+                              name={`q${q.id}`}
                               checked={isSelected}
-                              onChange={() => handleAnswerSelect(idx, optIdx)}
+                              onChange={() => handleAnswerSelect(q.id, optIdx)}
                               className="text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                               disabled={submitted}
                             />
                             <span className="flex-1 text-sm">{opt}</span>
-                            {submitted && isCorrectOption && (
+                            {showAsCorrect && (
                               <CheckCircle
                                 size={18}
                                 className="text-green-500 shrink-0"
                               />
                             )}
-                            {submitted && isSelected && !isCorrectOption && (
+                            {showAsWrongSelected && (
                               <XCircle
                                 size={18}
                                 className="text-red-500 shrink-0"
@@ -344,7 +362,7 @@ export default function CourseQuiz() {
                         type="text"
                         value={String(studentAnswer ?? "")}
                         onChange={(e) =>
-                          handleAnswerSelect(idx, e.target.value)
+                          handleAnswerSelect(q.id, e.target.value)
                         }
                         disabled={submitted}
                         placeholder="Type your answer..."
@@ -362,7 +380,9 @@ export default function CourseQuiz() {
                         >
                           {correct
                             ? "✓ Correct!"
-                            : `✗ Correct answer: ${(q.correctAnswers ?? [q.correctAnswer]).filter(Boolean).join(" / ")}`}
+                            : revealAnswers
+                              ? `✗ Correct answer: ${(q.correctAnswers ?? [q.correctAnswer]).filter(Boolean).join(" / ")}`
+                              : "✗ Incorrect"}
                         </p>
                       )}
                     </div>
@@ -374,17 +394,22 @@ export default function CourseQuiz() {
                       {[true, false].map((val) => {
                         const isSelected = studentAnswer === val;
                         const isCorrectOption = val === q.correctBoolean;
+                        const showAsCorrect =
+                          submitted &&
+                          ((revealAnswers && isCorrectOption) ||
+                            (isSelected && isCorrectOption));
+                        const showAsWrongSelected =
+                          submitted && isSelected && !isCorrectOption;
 
                         let optionStyle =
                           "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
-                        if (submitted) {
-                          if (isCorrectOption)
-                            optionStyle =
-                              "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
-                          else if (isSelected && !isCorrectOption)
-                            optionStyle =
-                              "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
-                        } else if (isSelected) {
+                        if (showAsCorrect) {
+                          optionStyle =
+                            "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
+                        } else if (showAsWrongSelected) {
+                          optionStyle =
+                            "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
+                        } else if (!submitted && isSelected) {
                           optionStyle =
                             "border-blue-500 bg-blue-50 dark:bg-blue-900/30";
                         }
@@ -392,7 +417,7 @@ export default function CourseQuiz() {
                         return (
                           <li
                             key={String(val)}
-                            onClick={() => handleAnswerSelect(idx, val)}
+                            onClick={() => handleAnswerSelect(q.id, val)}
                             className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${optionStyle} ${
                               !submitted
                                 ? "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -401,22 +426,22 @@ export default function CourseQuiz() {
                           >
                             <input
                               type="radio"
-                              name={`q${idx}`}
+                              name={`q${q.id}`}
                               checked={isSelected}
-                              onChange={() => handleAnswerSelect(idx, val)}
+                              onChange={() => handleAnswerSelect(q.id, val)}
                               className="text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                               disabled={submitted}
                             />
                             <span className="flex-1 text-sm">
                               {val ? "True" : "False"}
                             </span>
-                            {submitted && isCorrectOption && (
+                            {showAsCorrect && (
                               <CheckCircle
                                 size={18}
                                 className="text-green-500 shrink-0"
                               />
                             )}
-                            {submitted && isSelected && !isCorrectOption && (
+                            {showAsWrongSelected && (
                               <XCircle
                                 size={18}
                                 className="text-red-500 shrink-0"
@@ -457,7 +482,7 @@ export default function CourseQuiz() {
                               onChange={(e) => {
                                 const next = [...answerArr];
                                 next[pairIdx] = e.target.value;
-                                handleAnswerSelect(idx, next);
+                                handleAnswerSelect(q.id, next);
                               }}
                               className={`flex-1 p-2 border rounded-lg dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
                                 submitted
@@ -516,7 +541,7 @@ export default function CourseQuiz() {
                                 type="text"
                                 value={String(studentAnswer ?? "")}
                                 onChange={(e) =>
-                                  handleAnswerSelect(idx, e.target.value)
+                                  handleAnswerSelect(q.id, e.target.value)
                                 }
                                 disabled={submitted}
                                 placeholder="______"
@@ -538,14 +563,16 @@ export default function CourseQuiz() {
                         >
                           {correct
                             ? "✓ Correct!"
-                            : `✗ Correct answer: ${q.correctAnswer}`}
+                            : revealAnswers
+                              ? `✗ Correct answer: ${q.correctAnswer}`
+                              : "✗ Incorrect"}
                         </p>
                       )}
                     </div>
                   )}
 
                   {/* explanation */}
-                  {submitted && q.explanation && (
+                  {submitted && revealAnswers && q.explanation && (
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
                       <p className="text-sm text-blue-700 dark:text-blue-300 italic">
                         💡 {q.explanation}

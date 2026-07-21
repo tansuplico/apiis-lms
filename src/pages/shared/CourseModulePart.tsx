@@ -52,6 +52,8 @@ export default function CourseModulePart() {
   const [editedContent, setEditedContent] = useState("");
   const [editedQuestions, setEditedQuestions] = useState<QuizQuestion[]>([]);
   const [editedColor, setEditedColor] = useState("");
+  const [editedShowCorrectAnswers, setEditedShowCorrectAnswers] =
+    useState(true);
 
   // ── Delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -63,6 +65,7 @@ export default function CourseModulePart() {
     setEditedContent(currentPart.content ?? "");
     setEditedColor(currentPart.coverColor ?? "#ffffff");
     setEditedQuestions(currentPart.quizQuestions ?? []);
+    setEditedShowCorrectAnswers(currentPart.showCorrectAnswers ?? true);
   }, [currentPart?.id]);
 
   if (!currentModule || !currentPart) {
@@ -125,6 +128,7 @@ export default function CourseModulePart() {
           currentPartData.id,
           editedQuestions,
           currentPartData.updatedAt,
+          editedShowCorrectAnswers,
         );
       } else {
         await updatePart(course.id, currentModuleData.id, currentPartData.id, {
@@ -259,6 +263,8 @@ export default function CourseModulePart() {
                   quizQuestions={editedQuestions}
                   setQuizQuestions={setEditedQuestions}
                   isEditMode={true}
+                  showCorrectAnswers={editedShowCorrectAnswers}
+                  setShowCorrectAnswers={setEditedShowCorrectAnswers}
                 />
               ) : (
                 <TipTapEditor

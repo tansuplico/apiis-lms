@@ -61,6 +61,7 @@ interface CourseStore {
     partId: number,
     questions: QuizQuestion[],
     expectedUpdatedAt?: string, // ← added
+    showCorrectAnswers?: boolean,
   ) => Promise<void>;
   refreshCourse: (courseId: number) => Promise<void>;
   reorderPart: (
@@ -346,6 +347,7 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
     partId,
     questions,
     expectedUpdatedAt,
+    showCorrectAnswers,
   ) => {
     try {
       const { updatedAt } = await courseService.updateQuizQuestions(
@@ -354,6 +356,7 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
         partId,
         questions,
         expectedUpdatedAt,
+        showCorrectAnswers,
       );
 
       set((state) => ({
@@ -370,6 +373,9 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
                             ? {
                                 ...p,
                                 quizQuestions: questions,
+                                ...(showCorrectAnswers !== undefined && {
+                                  showCorrectAnswers,
+                                }),
                                 ...(updatedAt && { updatedAt }),
                               }
                             : p,

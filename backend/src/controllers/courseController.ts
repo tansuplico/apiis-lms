@@ -138,7 +138,7 @@ export const getAllCourses = async (req: Request, res: Response) => {
     const moduleIds = modulesResult.rows.map((m) => m.id);
 
     const partsResult = await pool.query(
-      `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at
+      `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at, show_correct_answers
        FROM course_parts
        WHERE module_id = ANY($1)
        ORDER BY module_id, order_index ASC`,
@@ -204,6 +204,9 @@ export const getAllCourses = async (req: Request, res: Response) => {
                 content: p.content,
                 order: p.order_index,
                 updatedAt: p.updated_at,
+                ...(p.slug === "quiz" && {
+                  showCorrectAnswers: p.show_correct_answers,
+                }),
                 ...(quizQuestions.length > 0 && { quizQuestions }),
               };
             });
@@ -317,7 +320,7 @@ export const getCourse = async (req: Request, res: Response) => {
     let partsResult = { rows: [] as any[] };
     if (moduleIds.length > 0) {
       partsResult = await pool.query(
-        `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at
+        `SELECT id, module_id, slug, name, cover_color, content, order_index, updated_at, show_correct_answers
          FROM course_parts WHERE module_id = ANY($1) ORDER BY order_index ASC`,
         [moduleIds],
       );
@@ -380,6 +383,9 @@ export const getCourse = async (req: Request, res: Response) => {
             content: p.content,
             order: p.order_index,
             updatedAt: p.updated_at,
+            ...(p.slug === "quiz" && {
+              showCorrectAnswers: p.show_correct_answers,
+            }),
             ...(quizQuestions.length > 0 && { quizQuestions }),
           };
         });
@@ -1382,7 +1388,7 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
     const { id, moduleId, partId } = req.params;
-    const { questions, expectedUpdatedAt } = req.body;
+    const { questions, expectedUpdatedAt, showCorrectAnswers } = req.body;
 
     if (isNaN(Number(id)) || isNaN(Number(moduleId)) || isNaN(Number(partId))) {
       res.status(400).json({ success: false, message: "Invalid ID." });
@@ -1554,6 +1560,17 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
       }
     }
 
+    if (
+      showCorrectAnswers !== undefined &&
+      typeof showCorrectAnswers !== "boolean"
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "showCorrectAnswers must be a boolean.",
+      });
+      return;
+    }
+
     const existing = await pool.query(
       `SELECT p.id, p.updated_at FROM course_parts p
        INNER JOIN course_modules m ON m.id = p.module_id
@@ -1637,8 +1654,13 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
       // Bump the part's updated_at so it stays the single version clock
       // shared between content edits and quiz edits on this part.
       const bumped = await client.query(
-        `UPDATE course_parts SET updated_at = NOW() WHERE id = $1 RETURNING updated_at`,
-        [partId],
+        showCorrectAnswers !== undefined
+          ? `UPDATE course_parts SET updated_at = NOW(), show_correct_answers = $2
+             WHERE id = $1 RETURNING updated_at`
+          : `UPDATE course_parts SET updated_at = NOW() WHERE id = $1 RETURNING updated_at`,
+        showCorrectAnswers !== undefined
+          ? [partId, showCorrectAnswers]
+          : [partId],
       );
 
       await client.query("COMMIT");

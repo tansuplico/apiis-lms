@@ -16,6 +16,8 @@ import {
   ToggleLeft,
   ArrowLeftRight,
   Check,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -36,6 +38,8 @@ interface CourseQuizProps {
   quizQuestions?: QuizQuestion[];
   setQuizQuestions?: React.Dispatch<React.SetStateAction<QuizQuestion[]>>;
   isEditMode?: boolean;
+  showCorrectAnswers?: boolean;
+  setShowCorrectAnswers?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // ── Constants
@@ -101,6 +105,8 @@ export default function CourseQuiz({
   quizQuestions: propQuizQuestions,
   setQuizQuestions,
   isEditMode = false,
+  showCorrectAnswers = true,
+  setShowCorrectAnswers,
 }: CourseQuizProps) {
   // ── Routing
   const { moduleNumber } = useParams();
@@ -146,45 +152,15 @@ export default function CourseQuiz({
     "",
   );
   const [promoteCollectionSearch, setPromoteCollectionSearch] = useState("");
-  const [creatingCollectionInline, setCreatingCollectionInline] =
-    useState(false);
-  const [newCollectionName, setNewCollectionName] = useState("");
-  const [creatingCollection, setCreatingCollection] = useState(false);
 
   const startPromoteToBank = (q: QuizQuestion) => {
     setPromotingQuestion(q);
     setPromoteCollectionId("");
     setPromoteCollectionSearch("");
-    setCreatingCollectionInline(false);
-    setNewCollectionName("");
     loadBankCollections();
   };
 
   const cancelPromoteToBank = () => setPromotingQuestion(null);
-
-  const createCollectionInline = async () => {
-    if (!newCollectionName.trim()) {
-      toast.warning("Enter a collection name first.");
-      return;
-    }
-    setCreatingCollection(true);
-    try {
-      const created = await quizBankCollectionService.create({
-        name: newCollectionName.trim(),
-      });
-      setBankCollections((prev) => [...prev, created]);
-      setPromoteCollectionId(created.id);
-      setCreatingCollectionInline(false);
-      setNewCollectionName("");
-      toast.success(`Created "${created.name}".`);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to create collection.",
-      );
-    } finally {
-      setCreatingCollection(false);
-    }
-  };
 
   const filteredPromoteCollections = bankCollections.filter((c) =>
     c.name.toLowerCase().includes(promoteCollectionSearch.trim().toLowerCase()),
@@ -585,6 +561,46 @@ export default function CourseQuiz({
         {isEditMode ? (
           /* Edit mode */
           <div className="space-y-6">
+            {/* Quiz settings */}
+            <div className="flex items-center justify-between gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3 min-w-0">
+                {showCorrectAnswers ? (
+                  <Eye
+                    size={18}
+                    className="text-purple-600 dark:text-purple-400 shrink-0"
+                  />
+                ) : (
+                  <EyeOff size={18} className="text-gray-400 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-gray-900 dark:text-white">
+                    Show correct answers after submission
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    When on, students see which answer was correct once they
+                    submit this quiz. When off, they only see their score.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showCorrectAnswers}
+                onClick={() => setShowCorrectAnswers?.((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  showCorrectAnswers
+                    ? "bg-purple-600"
+                    : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showCorrectAnswers ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
             {questions.length === 0 ? (
               <p className="text-center text-gray-500 dark:text-gray-400">
                 No questions yet. Add one below.
@@ -1636,7 +1652,7 @@ export default function CourseQuiz({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            className="bg-white dark:bg-gray-800 rounded-xl max-w-xl w-full shadow-2xl max-h-[80vh] flex flex-col overflow-hidden"
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
               <div className="flex items-center gap-2">
@@ -1676,82 +1692,36 @@ export default function CourseQuiz({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Collection
-                </label>
-                {!creatingCollectionInline && (
-                  <button
-                    onClick={() => setCreatingCollectionInline(true)}
-                    className="flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-300 hover:underline"
-                  >
-                    <Plus size={12} />
-                    New collection
-                  </button>
-                )}
-              </div>
-
-              {creatingCollectionInline && (
-                <div className="flex items-center gap-2 mb-3">
-                  <input
-                    type="text"
-                    autoFocus
-                    value={newCollectionName}
-                    onChange={(e) => setNewCollectionName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") createCollectionInline();
-                    }}
-                    placeholder="Collection name"
-                    className="flex-1 p-2 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                  <button
-                    onClick={createCollectionInline}
-                    disabled={creatingCollection}
-                    className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium shrink-0"
-                  >
-                    {creatingCollection ? "Creating…" : "Create"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCreatingCollectionInline(false);
-                      setNewCollectionName("");
-                    }}
-                    className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg shrink-0"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                Collection
+              </label>
 
               {bankCollectionsLoading ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Loading...
                 </p>
               ) : bankCollections.length === 0 ? (
-                !creatingCollectionInline && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No collections yet. Create one above to get started.
-                  </p>
-                )
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No collections yet. Create one from the Question Bank page
+                  first.
+                </p>
               ) : (
                 <>
-                  {bankCollections.length > 6 && (
-                    <div className="relative mb-2">
-                      <Search
-                        size={14}
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={promoteCollectionSearch}
-                        onChange={(e) =>
-                          setPromoteCollectionSearch(e.target.value)
-                        }
-                        placeholder="Search collections..."
-                        className="w-full pl-8 pr-2 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      />
-                    </div>
-                  )}
+                  <div className="relative mb-2">
+                    <Search
+                      size={14}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      type="text"
+                      value={promoteCollectionSearch}
+                      onChange={(e) =>
+                        setPromoteCollectionSearch(e.target.value)
+                      }
+                      placeholder="Search collections..."
+                      className="w-full pl-8 pr-2 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {filteredPromoteCollections.length === 0 ? (
                       <p className="text-sm text-gray-500 dark:text-gray-400">

@@ -10,7 +10,7 @@ export default function CourseCard({ course, onClick }: CourseCardProps) {
   // ── Render
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden flex flex-col h-full cursor-pointer border border-gray-200 dark:border-gray-700"
+      className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col h-full cursor-pointer border border-gray-100 dark:border-gray-700"
       onClick={() => onClick(course)}
     >
       {/* Thumbnail */}
@@ -28,7 +28,7 @@ export default function CourseCard({ course, onClick }: CourseCardProps) {
         <img
           src={resolveThumbnailUrl(course.thumbnailUrl ?? null)}
           alt={course.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           loading="lazy"
           onError={(e) => {
             const img = e.target as HTMLImageElement;
@@ -57,8 +57,11 @@ export default function CourseCard({ course, onClick }: CourseCardProps) {
           </div>
           <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
-              className="h-full bg-green-500 rounded-full"
-              style={{ width: `${percentage}%` }}
+              className="h-full rounded-full"
+              style={{
+                width: `${percentage}%`,
+                backgroundColor: "var(--student-blue)",
+              }}
             />
           </div>
         </div>

@@ -40,6 +40,71 @@
   }
 }
 
+/* ─── Imports ────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@import "react-toastify/dist/ReactToastify.css";
+
+@tailwind utilities;
+@plugin "@tailwindcss/typography";
+
+/* ─── Custom Variants ────────────────────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Base ───────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-sans:
+      "Lexend", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-serif: "Lexend", Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-mono:
+      "Lexend", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+    color: #0f0f0f;
+    background-color: #f6f6f6;
+
+    /* ── Student portal tokens ─────────────────────────────────
+       Kid-friendly ("colorful but calm") palette for the student
+       role only. Admin/Facilitator keep the existing blue/gray
+       system — do not reuse these on admin or facilitator pages. */
+    --student-coral: #ff6a4d;
+    --student-coral-soft: #ffe4dc;
+    --student-teal: #0e9488;
+    --student-teal-soft: #dcf2ef;
+    --student-blue: #2f7de1;
+    --student-blue-soft: #dceafd;
+    --student-ink: #2a2620;
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html,
+  body,
+  #root {
+    font-family: var(--font-sans);
+  }
+
+  .dark {
+    /* App.css .dark */
+    --student-coral: #ff8064;
+    --student-coral-soft: rgba(255, 106, 77, 0.16);
+    --student-teal: #2ab8ab;
+    --student-teal-soft: rgba(14, 148, 136, 0.18);
+    --student-blue: #5b9bef;
+    --student-blue-soft: rgba(47, 125, 225, 0.18);
+    --student-ink: #f5f2ec;
+  }
+}
+
 /* ─── Components ─────────────────────────────────────────────── */
 @layer components {
   /* ── Global ────────────────────────────────────────────────── */

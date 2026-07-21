@@ -96,7 +96,7 @@ async function batchFetchQuizData(moduleIds: number[]) {
   const allQuestions =
     quizPartIds.length > 0
       ? await pool.query(
-          `SELECT part_id, question_data FROM quiz_questions
+          `SELECT id, part_id, question_data FROM quiz_questions
        WHERE part_id = ANY($1) ORDER BY id ASC`,
           [quizPartIds],
         )
@@ -189,9 +189,9 @@ function buildStudentGradebook(
     const studentAnswers = studentAnswer.answers;
     let correct = 0;
 
-    questions.forEach((q, index) => {
+    questions.forEach((q) => {
       const qd = q.question_data;
-      const studentAns = studentAnswers[String(index)];
+      const studentAns = studentAnswers[String(q.id)];
       if (isAnswerCorrect(qd, studentAns)) correct++;
     });
 
@@ -693,7 +693,7 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
 
     if (quizPartResult.rows.length > 0) {
       const questionsResult = await pool.query(
-        `SELECT question_data FROM quiz_questions
+        `SELECT id, question_data FROM quiz_questions
      WHERE part_id = $1 ORDER BY id ASC`,
         [quizPartResult.rows[0].id],
       );
@@ -718,9 +718,9 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
       const questions = questionsResult.rows;
       let correct = 0;
 
-      questions.forEach((q, index) => {
+      questions.forEach((q) => {
         const qd = q.question_data;
-        const studentAns = answers[String(index)];
+        const studentAns = answers[String(q.id)];
         if (isAnswerCorrect(qd, studentAns)) correct++;
       });
 
