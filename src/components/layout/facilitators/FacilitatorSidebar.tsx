@@ -11,6 +11,7 @@ import {
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import SettingsModal from "@/components/shared/SettingsModal";
+import logo from "@/assets/logo.png";
 
 export default function FacilitatorSidebar() {
   // ── State
@@ -21,10 +22,8 @@ export default function FacilitatorSidebar() {
     <>
       <aside className="w-64 h-screen bg-gray-50 dark:bg-gray-950 flex flex-col border-r border-gray-200 dark:border-gray-800 fixed top-0 left-0 z-10 transition-colors duration-300">
         {/* Brand */}
-        <div className="px-6 pt-8 pb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight text-center">
-            APIIS
-          </h1>
+        <div className="px-6 pt-8 pb-6 flex justify-center items-center">
+          <img src={logo} className="w-32 " />
         </div>
 
         {/* Main navigation */}
