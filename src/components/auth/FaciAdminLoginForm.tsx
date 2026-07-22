@@ -48,10 +48,10 @@ export default function FaciAdminLoginForm() {
       await facilitatorLogin(trimmedEmail, trimmedPassword);
       const facilitator = useFacilitatorStore.getState().currentFacilitator;
       if (facilitator?.mustChangePassword) {
-        navigate("/facilitator/change-password");
+        navigate("/facilitator/change-password", { replace: true });
         return;
       }
-      navigate("/facilitator/dashboard");
+      navigate("/facilitator/dashboard", { replace: true });
       return;
     } catch (facilitatorErr: any) {
       if (
@@ -67,7 +67,7 @@ export default function FaciAdminLoginForm() {
 
     try {
       await adminLogin(trimmedEmail, trimmedPassword);
-      navigate("/admin/dashboard");
+      navigate("/admin/dashboard", { replace: true });
     } catch (adminErr: any) {
       if (adminErr instanceof ApiError && adminErr.statusCode === 401) {
         toast.error("Invalid email or password.");

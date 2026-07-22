@@ -102,6 +102,12 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
       if (current) {
         set({ currentFacilitator: { ...current, mustChangePassword: false } });
       }
+
+      await useShopStore.getState().fetchItems();
+      await useCenterStore.getState().fetchCenters();
+      await useCourseStore.getState().fetchCourses();
+      await useStudentListStore.getState().fetchStudents();
+
       return true;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to change password.");
