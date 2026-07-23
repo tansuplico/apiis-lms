@@ -71,9 +71,9 @@ export default function AttendanceRecords() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+          <h3 className="text-4xl text-gray-900 dark:text-white">
             Attendance Records
-          </h1>
+          </h3>
         </div>
 
         {/* Center dropdown */}

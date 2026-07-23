@@ -19,7 +19,7 @@ export default function Profile() {
 
   // ── Guard: redirect if not authenticated
   if (!currentAdmin) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/facilitator-admin/login" replace />;
   }
 
   // ── Handlers: update cover / profile picture

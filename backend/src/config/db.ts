@@ -24,8 +24,7 @@ if (process.env.NODE_ENV !== "script") {
 }
 
 pool.on("error", (err) => {
-  console.error("❌ PostgreSQL error:", err);
-  process.exit(-1);
+  console.error("❌ PostgreSQL pool error (idle client removed):", err);
 });
 
 // ── Export

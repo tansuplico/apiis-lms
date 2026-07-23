@@ -149,7 +149,7 @@ export default function Dashboard() {
                 My Courses
               </p>
               <p
-                className="text-2xl font-extrabold"
+                className="text-3xl text-gray-900 dark:text-white mt-1"
                 style={{ color: "var(--student-ink)" }}
               >
                 {enrolledCourses.length}

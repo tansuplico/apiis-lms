@@ -115,7 +115,7 @@ export default function Courses() {
       {/* Content */}
       {showSkeleton ? (
         viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-fr">
             {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
               <CourseGridCardSkeleton key={i} role="facilitator" />
             ))}
@@ -132,7 +132,7 @@ export default function Courses() {
           No courses found matching "{searchTerm}"
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-fr">
           {paginatedCourses.map((course) => (
             <CourseGridCard
               key={course.id}

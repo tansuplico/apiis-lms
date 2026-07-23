@@ -66,17 +66,12 @@ export default function Courses() {
   return (
     <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 pb-10">
       {/* Page header */}
-      <h3
-        className="text-4xl font-extrabold mb-1"
-        style={{ color: "var(--student-ink)" }}
-      >
-        My Courses
-      </h3>
+      <h3 className="text-4xl text-gray-900 my-9 dark:text-white">Courses</h3>
 
       {/* Search, subject filter & view toggle */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         {/* Search */}
-        <div className="w-full sm:w-96 lg:w-105 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-5 py-3 rounded-full focus-within:border-[var(--student-blue)] transition-colors">
+        <div className="w-full sm:w-96 lg:w-105 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-5 py-3 rounded-full focus-within:border-(--student-blue) transition-colors">
           <Search
             size={20}
             strokeWidth={1.5}
@@ -101,7 +96,7 @@ export default function Courses() {
               }
             >
               <div className="relative w-full sm:w-48">
-                <ListboxButton className="relative w-full flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-full font-medium border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--student-blue)]/40 transition-colors">
+                <ListboxButton className="relative w-full flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-full font-medium border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-(--student-blue)/40 transition-colors">
                   <span className="truncate">
                     {selectedCategory ?? "All Subjects"}
                   </span>
@@ -121,7 +116,7 @@ export default function Courses() {
                       value={cat}
                       className={({ active }) =>
                         `cursor-pointer select-none py-2.5 px-4 text-sm transition-colors ${
-                          active ? "bg-[var(--student-blue-soft)]" : ""
+                          active ? "bg-(--student-blue-soft)" : ""
                         }`
                       }
                     >

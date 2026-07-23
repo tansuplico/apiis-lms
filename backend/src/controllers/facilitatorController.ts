@@ -1,6 +1,6 @@
 // src/controllers/facilitatorController.ts
 import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
 

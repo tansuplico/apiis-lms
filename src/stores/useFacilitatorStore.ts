@@ -10,6 +10,7 @@ import { useStudentListStore } from "./useStudentListStore";
 import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
+import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 
 interface FacilitatorStore {
   currentFacilitator: Facilitator | null;
@@ -59,18 +60,20 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
   },
 
   // ── Actions: login
-  login: async (email, password): Promise<void> => {
+  login: async (email: string, password: string): Promise<void> => {
     set({ isLoading: true });
     try {
       const facilitator = await facilitatorService.login(email, password);
-      set({ currentFacilitator: facilitator, isAuthenticated: true });
 
       if (!facilitator.mustChangePassword) {
         await useShopStore.getState().fetchItems();
         await useCenterStore.getState().fetchCenters();
         await useCourseStore.getState().fetchCourses();
         await useStudentListStore.getState().fetchStudents();
+        await useQuizBankCollectionStore.getState().fetchCollections();
       }
+
+      set({ currentFacilitator: facilitator, isAuthenticated: true });
     } finally {
       set({ isLoading: false });
     }
@@ -107,6 +110,7 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
       await useCenterStore.getState().fetchCenters();
       await useCourseStore.getState().fetchCourses();
       await useStudentListStore.getState().fetchStudents();
+      await useQuizBankCollectionStore.getState().fetchCollections();
 
       return true;
     } catch (err: any) {

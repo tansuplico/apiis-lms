@@ -1,6 +1,6 @@
 // src/controllers/authController.ts
 import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../config/db";
 import { sendPasswordResetEmail } from "../utils/emailService";

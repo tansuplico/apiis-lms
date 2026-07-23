@@ -173,9 +173,9 @@ export default function AdminFacilitators() {
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+        <h3 className="text-4xl text-gray-900 dark:text-white">
           All Facilitators
-        </h1>
+        </h3>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="flex-1 sm:w-80 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">

@@ -172,9 +172,9 @@ export default function Students() {
     startIndex + ITEMS_PER_PAGE,
   );
 
-useEffect(() => {
-  setCurrentPage(1);
-}, [debouncedSearch, statusFilter, centerFilter]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, centerFilter]);
 
   // ── Handlers: pagination
   const goToPage = (page: number) => {
@@ -309,9 +309,7 @@ useEffect(() => {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
-        All Students
-      </h1>
+      <h3 className="text-4xl text-gray-900 dark:text-white"> All Students </h3>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex gap-5">
@@ -675,7 +673,7 @@ useEffect(() => {
 
       {studentForHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
-          <div className="w-[440px] h-[580px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
+          <div className="w-110 h-145 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
             {/* Header — pinned */}
             <div className="shrink-0 flex items-start justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
               <div>
@@ -709,7 +707,7 @@ useEffect(() => {
                     size={28}
                     className="text-gray-300 dark:text-gray-700"
                   />
-                  <p className="text-sm text-gray-400 dark:text-gray-500 max-w-[220px]">
+                  <p className="text-sm text-gray-400 dark:text-gray-500 max-w-55">
                     No center changes yet. Assignments and transfers will show
                     up here.
                   </p>
@@ -728,7 +726,7 @@ useEffect(() => {
                             className="relative pl-5 pb-5 last:pb-0"
                           >
                             <span
-                              className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-gray-900 ${
+                              className={`absolute -left-1.25 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-gray-900 ${
                                 log.action === "added"
                                   ? "bg-green-500"
                                   : "bg-rose-500"

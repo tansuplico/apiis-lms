@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Calendar,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
@@ -96,13 +97,32 @@ export default function Dashboard() {
   return (
     <div className="space-y-10 pb-10 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       {/* Hero Greeting */}
-      <div className="bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800 rounded-2xl p-8 md:p-10 text-white shadow-lg">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">
-          {greeting}, Facilitator {currentFacilitator.firstName}!
+      <div className="bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800 rounded-2xl p-8 md:p-12 text-white shadow-xl">
+        <h1 className="text-3xl md:text-5xl font-extrabold mb-3">
+          {greeting}, Facilitator {currentFacilitator.firstName}
         </h1>
-        <p className="text-lg opacity-90">
-          Here's a quick overview of your centers and students
+        <p className="text-lg md:text-xl opacity-90 mb-6">
+          Overview{" "}
+          {new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          })}
         </p>
+        <div className="flex flex-wrap gap-4">
+          <Link
+            to="/facilitator/students"
+            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
+          >
+            <Users size={18} /> Manage Students
+          </Link>
+          <Link
+            to="/facilitator/attendance"
+            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
+          >
+            <BarChart3 size={18} /> View Attendance
+          </Link>
+        </div>
       </div>
 
       {/* Quick Stats Cards */}

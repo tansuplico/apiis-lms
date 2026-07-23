@@ -67,6 +67,7 @@ import ChangePassword from "./pages/students/ChangePassword";
 import ScrollToTop from "./components/shared/ScrollToTop";
 import PublicRoute from "./components/shared/PublicRoute";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
+import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore";
 
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
@@ -89,6 +90,9 @@ export default function App() {
   const fetchStudents = useStudentListStore((s) => s.fetchStudents);
   const fetchFacilitators = useFacilitatorListStore((s) => s.fetchFacilitators);
   const fetchTickets = useTicketStore((s) => s.fetchTickets);
+  const fetchCollections = useQuizBankCollectionStore(
+    (s) => s.fetchCollections,
+  );
 
   // ── State
   const [isInitialized, setIsInitialized] = useState(false);
@@ -133,6 +137,7 @@ export default function App() {
       }
       if (isAdmin || isFacilitator) {
         fetches.push(fetchStudents());
+        fetches.push(fetchCollections());
       }
       if (isAdmin) {
         fetches.push(fetchFacilitators());

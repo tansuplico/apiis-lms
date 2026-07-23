@@ -1,13 +1,7 @@
 // src/pages/admin/Shop.tsx
-import { ChevronDown, Coins, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Coins, Search, Plus, Pencil, Trash2 } from "lucide-react";
 import shop from "../../assets/shop.png";
 import { useState, useEffect } from "react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
 import { Accessory, AccessoryCategory } from "@/types/types";
 import { useShopStore } from "@/stores/useShopStore";
 import { toast } from "react-toastify";
@@ -44,7 +38,6 @@ export default function AdminShop() {
   const { items, isLoading, fetchItems, addItem, editItem, removeItem } =
     useShopStore();
 
-  // ── Search & category state
   const [selectedCategory, setSelectedCategory] = useState<
     AccessoryCategory | "All"
   >("All");
@@ -158,85 +151,72 @@ export default function AdminShop() {
   return (
     <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 pb-10">
       {/* Hero Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-[#80BC04] dark:bg-[#5e8f03] text-white p-8 md:p-12 rounded-2xl overflow-hidden shadow-lg">
+      <div className="flex flex-row justify-between items-center bg-[#80BC04] dark:bg-[#5e8f03] text-white p-7 md:p-12 rounded-2xl overflow-hidden shadow-lg">
         <div className="max-w-lg">
-          <h3 className="text-4xl md:text-5xl font-bold mb-4">Shop</h3>
-          <p className="text-lg md:text-xl opacity-95">
-            Manage shop items add, edit, or remove profile{" "}
-            <br className="hidden md:block" />
-            accessories and customizations
+          <h3 className="text-3xl md:text-4xl font-bold mb-3">Shop</h3>
+          <p className="text-base md:text-lg opacity-95">
+            Manage shop items add, edit, or remove profile accessories and
+            customizations
           </p>
         </div>
         <img
           src={shop}
           alt="Shop illustration"
-          className="w-48 md:w-64 lg:w-80 mt-6 md:mt-0"
+          className="w-28 md:w-65 shrink-0 ml-4"
         />
       </div>
 
       {/* Search + Category + Add Button */}
-      <div className="flex flex-col sm:flex-row py-10 justify-between items-start sm:items-center gap-4">
-        {/* Search */}
-        <div className="flex-1 flex items-center gap-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3.5 rounded-xl focus-within:border-[#0070FF]">
-          <Search
-            size={20}
-            strokeWidth={1.8}
-            className="text-gray-500 dark:text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Search an accessory..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          />
-          {searchText && (
-            <button
-              onClick={() => setSearchText("")}
-              className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        {/* Category Dropdown */}
-        <Listbox value={selectedCategory} onChange={setSelectedCategory}>
-          <div className="relative w-full sm:w-60">
-            <ListboxButton className="relative w-full flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-[#0070FF] hover:text-white px-5 py-3.5 rounded-xl font-medium border border-gray-300 dark:border-gray-700 focus:outline-none">
-              <span className="block truncate">{selectedCategory}</span>
-              <ChevronDown size={18} strokeWidth={2} className="opacity-70" />
-            </ListboxButton>
-            <ListboxOptions
-              modal={false}
-              className="absolute mt-2 w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-72 overflow-auto z-50 focus:outline-none"
-            >
-              {(["All", ...CATEGORIES] as const).map((cat) => (
-                <ListboxOption
-                  key={cat}
-                  value={cat}
-                  className={({ active, selected }) =>
-                    `relative cursor-pointer select-none py-3 px-5 text-gray-900 dark:text-gray-100 transition-colors ${active ? "bg-[#0070FF] text-white" : ""} ${selected ? "font-medium" : ""}`
-                  }
-                >
-                  {cat}
-                </ListboxOption>
-              ))}
-            </ListboxOptions>
+      <div className="flex flex-col sm:flex-row py-10 justify-between items-start sm:items-center gap-3">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Search */}
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+            <Search size={20} className="text-gray-500 dark:text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search an accessory..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                ×
+              </button>
+            )}
           </div>
-        </Listbox>
+
+          {/* Category Dropdown */}
+          <select
+            value={selectedCategory}
+            onChange={(e) =>
+              setSelectedCategory(e.target.value as AccessoryCategory | "All")
+            }
+            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+          >
+            <option value="All">All categories</option>
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Add Item Button */}
         <button
           onClick={openAdd}
           disabled={!online}
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all shrink-0 ${
             online
-              ? "bg-[#0070FF] hover:bg-[#0063e4] text-white cursor-pointer"
+              ? "bg-[#0070FF] hover:bg-[#0063e4] text-white cursor-pointer shadow-md hover:shadow-lg"
               : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
           }`}
         >
-          <Plus size={18} />
+          <Plus size={20} />
           Add Item
         </button>
       </div>

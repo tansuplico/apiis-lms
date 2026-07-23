@@ -12,6 +12,7 @@ import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
 import { useTicketStore } from "./useTicketStore";
+import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 
 interface AdminStore {
   currentAdmin: Admin | null;
@@ -64,7 +65,6 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
     set({ isLoading: true });
     try {
       const admin = await adminService.login(email, password);
-      set({ currentAdmin: admin, isAuthenticated: true });
 
       await useShopStore.getState().fetchItems();
       await useCenterStore.getState().fetchCenters();
@@ -72,6 +72,8 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
       await useStudentListStore.getState().fetchStudents();
       await useFacilitatorListStore.getState().fetchFacilitators();
       await useTicketStore.getState().fetchTickets();
+      await useQuizBankCollectionStore.getState().fetchCollections();
+      set({ currentAdmin: admin, isAuthenticated: true });
     } finally {
       set({ isLoading: false });
     }

@@ -27,6 +27,8 @@ import { tokenStorage } from "@/services/tokenStorage";
 import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkeleton";
 import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
+import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
+import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
 
 const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
@@ -44,8 +46,6 @@ const QUESTION_TYPE_ICONS: Record<QuizQuestionType, typeof ListChecks> = {
   matching: ArrowLeftRight,
 };
 
-// Deterministic per-collection accent, keyed by id (not name) so renaming
-// a collection never shuffles its color.
 const COLLECTION_COLORS = [
   "#3B82F6", // blue
   "#10B981", // green
@@ -93,8 +93,12 @@ const emptyDraft = (
 };
 
 export default function QuestionBank() {
-  const [collections, setCollections] = useState<QuizBankCollection[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const {
+    collections,
+    isLoading: collectionsLoading,
+    fetchCollections,
+  } = useQuizBankCollectionStore();
+
   const [activeCollection, setActiveCollection] =
     useState<QuizBankCollection | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">(
@@ -128,26 +132,23 @@ export default function QuestionBank() {
   });
   const [savingCollection, setSavingCollection] = useState(false);
 
+  const [pendingDeleteCollection, setPendingDeleteCollection] =
+    useState<QuizBankCollection | null>(null);
+  const [deletingCollection, setDeletingCollection] = useState(false);
+
+  const [pendingDeleteQuestion, setPendingDeleteQuestion] =
+    useState<BankQuestion | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
+
   useEffect(() => {
-    loadCollections();
+    fetchCollections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (activeCollection) loadQuestions(activeCollection.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCollection?.id]);
-
-  const loadCollections = async () => {
-    setCollectionsLoading(true);
-    try {
-      const data = await quizBankCollectionService.getAll();
-      setCollections(data);
-    } catch {
-      toast.error("Failed to load collections.");
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
 
   const loadQuestions = async (collectionId: number) => {
     setQuestionsLoading(true);
@@ -198,7 +199,6 @@ export default function QuestionBank() {
         if (activeCollection?.id === updated.id) setActiveCollection(updated);
       }
       setCollectionModalMode(null);
-      loadCollections();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to save the collection.",
@@ -208,13 +208,13 @@ export default function QuestionBank() {
     }
   };
 
-  const removeCollection = async (c: QuizBankCollection) => {
-    if (
-      !window.confirm(
-        `Delete "${c.name}"? This deletes all ${c.questionCount} question(s) inside it and removes them from any quiz that uses them.`,
-      )
-    )
-      return;
+  const removeCollection = (c: QuizBankCollection) =>
+    setPendingDeleteCollection(c);
+
+  const confirmRemoveCollection = async () => {
+    if (!pendingDeleteCollection) return;
+    const c = pendingDeleteCollection;
+    setDeletingCollection(true);
     try {
       const result = await quizBankCollectionService.delete(c.id);
       toast.success(
@@ -223,9 +223,11 @@ export default function QuestionBank() {
           : "Deleted.",
       );
       if (activeCollection?.id === c.id) backToCollections();
-      loadCollections();
+      setPendingDeleteCollection(null);
     } catch {
       toast.error("Failed to delete the collection.");
+    } finally {
+      setDeletingCollection(false);
     }
   };
 
@@ -379,24 +381,24 @@ export default function QuestionBank() {
     }
   };
 
-  const remove = async (id: number) => {
-    if (
-      !window.confirm(
-        "Delete this question? It will also be removed from any quiz that references it.",
-      )
-    )
-      return;
+  const remove = (q: BankQuestion) => setPendingDeleteQuestion(q);
+
+  const confirmRemoveQuestion = async () => {
+    if (!pendingDeleteQuestion) return;
+    setDeletingQuestion(true);
     try {
-      const result = await questionBankService.delete(id);
+      const result = await questionBankService.delete(pendingDeleteQuestion.id);
       toast.success(
         result.quizzesAffected > 0
           ? `Deleted. Removed from ${result.quizzesAffected} quiz(zes).`
           : "Deleted.",
       );
       if (activeCollection) loadQuestions(activeCollection.id);
-      loadCollections();
+      setPendingDeleteQuestion(null);
     } catch {
       toast.error("Failed to delete the question.");
+    } finally {
+      setDeletingQuestion(false);
     }
   };
 
@@ -448,7 +450,7 @@ export default function QuestionBank() {
           </div>
         </div>
 
-        {collectionsLoading ? (
+        {collectionsLoading && collections.length === 0 ? (
           viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
@@ -639,6 +641,17 @@ export default function QuestionBank() {
             </div>
           </div>
         )}
+
+        {pendingDeleteCollection && (
+          <DeleteConfirmModal
+            title="Delete Collection"
+            message={`This deletes all ${pendingDeleteCollection.questionCount} question(s) inside it and removes them from any quiz that uses them.`}
+            itemName={pendingDeleteCollection.name}
+            onConfirm={confirmRemoveCollection}
+            onCancel={() => setPendingDeleteCollection(null)}
+            isDeleting={deletingCollection}
+          />
+        )}
       </div>
     );
   }
@@ -706,7 +719,7 @@ export default function QuestionBank() {
                   <Pencil size={16} />
                 </button>
                 <button
-                  onClick={() => remove(q.id)}
+                  onClick={() => remove(q)}
                   className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
                   title="Delete"
                 >
@@ -1131,6 +1144,17 @@ export default function QuestionBank() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingDeleteQuestion && (
+        <DeleteConfirmModal
+          title="Delete Question"
+          message="This question will also be removed from any quiz that references it."
+          itemName={pendingDeleteQuestion.question}
+          onConfirm={confirmRemoveQuestion}
+          onCancel={() => setPendingDeleteQuestion(null)}
+          isDeleting={deletingQuestion}
+        />
       )}
     </div>
   );
