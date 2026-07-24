@@ -49,6 +49,9 @@ const isDev = process.env.NODE_ENV === "development";
 // ── Security & middleware
 app.disable("x-powered-by");
 
+// Cache-Control: immutable header and is unaffected by this.
+app.disable("etag");
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },

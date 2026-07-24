@@ -144,8 +144,17 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
     }
 
     set({ isLoading: true });
+
+    let student: Student;
     try {
-      const student = await studentService.login(idNumber, password);
+      student = await studentService.login(idNumber, password);
+    } catch (err: any) {
+      toast.error(err.message ?? "Login failed.");
+      set({ isLoading: false });
+      return false;
+    }
+
+    try {
       const progress = await studentService.getProgress();
       await useShopStore.getState().fetchItems();
       const fetchedFresh = await useCourseStore.getState().fetchCourses();
@@ -168,9 +177,24 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       });
 
       return true;
-    } catch (err: any) {
-      toast.error(err.message ?? "Login failed.");
-      return false;
+    } catch (err) {
+      console.error("Post-login initialization failed:", err);
+      toast.error(
+        "Signed in, but couldn't load your data. Some info may be out of date until you're back online.",
+      );
+
+      try {
+        await saveLocalSession(student);
+      } catch {
+        // best-effort only; not fatal to login
+      }
+
+      set({
+        currentStudent: student,
+        isAuthenticated: true,
+      });
+
+      return true;
     } finally {
       set({ isLoading: false });
     }
