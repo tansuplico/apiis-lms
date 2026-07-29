@@ -21,7 +21,7 @@ export default function CourseActivity({ part }: CourseActivityProps) {
     Number(window.location.pathname.match(/module-(\d+)/)?.[1]) || 1;
 
   const alreadyCompleted =
-    currentStudent?.courseProgress[course.id]?.completedParts.includes(
+    currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
       currentPartSlug ?? "",
     ) ?? false;
 

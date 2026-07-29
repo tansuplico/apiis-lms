@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import pool from "../config/db";
 import { sendPasswordResetEmail } from "../utils/emailService";
 
@@ -9,6 +10,7 @@ import { sendPasswordResetEmail } from "../utils/emailService";
 const BCRYPT_ROUNDS = process.env.NODE_ENV === "production" ? 12 : 10;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_STALE_MS = 30 * 60 * 1000; // 30 minutes of inactivity frees up the account
 
 const ROLE_TABLE_MAP: Record<string, string> = {
   student: "students",
@@ -32,12 +34,31 @@ const COMMON_PASSWORDS = [
 ];
 
 // ── Helpers
-const generateToken = (id: number, role: string): string => {
+const generateToken = (id: number, role: string, sessionId: string): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not defined.");
   const expiresIn = (process.env.JWT_EXPIRES_IN ||
     "7d") as jwt.SignOptions["expiresIn"];
-  return jwt.sign({ id, role }, secret, { expiresIn });
+  return jwt.sign({ id, role, sessionId }, secret, { expiresIn });
+};
+
+// An existing session only blocks a new login if it still has a session_id
+// AND it's been active within the staleness window. A crashed/force-closed
+// app (no proper logout) will free itself up automatically after 30 minutes.
+const hasActiveSession = (
+  sessionId: string | null,
+  lastActive: Date | null,
+): boolean => {
+  if (!sessionId || !lastActive) return false;
+  return Date.now() - new Date(lastActive).getTime() < SESSION_STALE_MS;
+};
+
+const rejectAlreadyLoggedIn = (res: Response) => {
+  res.status(409).json({
+    success: false,
+    message:
+      "This account is already logged in on another device. Please log out there first, or wait a few minutes.",
+  });
 };
 
 const checkLockout = (user: any, res: Response): boolean => {
@@ -116,7 +137,7 @@ export const studentLogin = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT id, id_number, password, first_name, middle_name, last_name,
               profile_picture, cover_color, coins, status, must_change_password,
-              failed_login_attempts, locked_until
+              failed_login_attempts, locked_until, session_id, session_last_active
        FROM students WHERE id_number = $1`,
       [idNumber.trim()],
     );
@@ -161,14 +182,25 @@ export const studentLogin = async (req: Request, res: Response) => {
       return;
     }
 
+    if (hasActiveSession(student.session_id, student.session_last_active)) {
+      rejectAlreadyLoggedIn(res);
+      return;
+    }
+
     await resetFailedAttempts("students", student.id);
+
+    const sessionId = randomUUID();
+    await pool.query(
+      `UPDATE students SET session_id = $1, session_last_active = NOW() WHERE id = $2`,
+      [sessionId, student.id],
+    );
 
     const centerResult = await pool.query(
       `SELECT center_id FROM student_centers WHERE student_id = $1 AND is_current = TRUE LIMIT 1`,
       [student.id],
     );
 
-    const token = generateToken(student.id, "student");
+    const token = generateToken(student.id, "student", sessionId);
 
     res.status(200).json({
       success: true,
@@ -217,7 +249,7 @@ export const facilitatorLogin = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT id, email, password, first_name, middle_name, last_name,
               profile_picture, cover_color, status, must_change_password,
-              failed_login_attempts, locked_until
+              failed_login_attempts, locked_until, session_id, session_last_active
        FROM facilitators WHERE email = $1`,
       [email.trim().toLowerCase()],
     );
@@ -262,14 +294,27 @@ export const facilitatorLogin = async (req: Request, res: Response) => {
       return;
     }
 
+    if (
+      hasActiveSession(facilitator.session_id, facilitator.session_last_active)
+    ) {
+      rejectAlreadyLoggedIn(res);
+      return;
+    }
+
     await resetFailedAttempts("facilitators", facilitator.id);
+
+    const sessionId = randomUUID();
+    await pool.query(
+      `UPDATE facilitators SET session_id = $1, session_last_active = NOW() WHERE id = $2`,
+      [sessionId, facilitator.id],
+    );
 
     const centerResult = await pool.query(
       `SELECT center_id FROM center_facilitators WHERE facilitator_id = $1`,
       [facilitator.id],
     );
 
-    const token = generateToken(facilitator.id, "facilitator");
+    const token = generateToken(facilitator.id, "facilitator", sessionId);
 
     res.status(200).json({
       success: true,
@@ -317,7 +362,7 @@ export const adminLogin = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT id, email, password, first_name, middle_name, last_name,
               profile_picture, cover_color, status,
-              failed_login_attempts, locked_until
+              failed_login_attempts, locked_until, session_id, session_last_active
        FROM admins WHERE email = $1`,
       [email.trim().toLowerCase()],
     );
@@ -353,9 +398,20 @@ export const adminLogin = async (req: Request, res: Response) => {
       return;
     }
 
+    if (hasActiveSession(admin.session_id, admin.session_last_active)) {
+      rejectAlreadyLoggedIn(res);
+      return;
+    }
+
     await resetFailedAttempts("admins", admin.id);
 
-    const token = generateToken(admin.id, "admin");
+    const sessionId = randomUUID();
+    await pool.query(
+      `UPDATE admins SET session_id = $1, session_last_active = NOW() WHERE id = $2`,
+      [sessionId, admin.id],
+    );
+
+    const token = generateToken(admin.id, "admin", sessionId);
 
     res.status(200).json({
       success: true,
@@ -477,6 +533,33 @@ export const changePassword = async (req: Request, res: Response) => {
       .json({ success: true, message: "Password changed successfully." });
   } catch (err) {
     console.error("changePassword error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// ── Logout (all roles) — clears the session marker so the account is
+// immediately free for another login, instead of waiting for the
+// staleness window to expire.
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const { id, role } = (req as any).user;
+
+    const table = ROLE_TABLE_MAP[role];
+    if (!table) {
+      res.status(403).json({ success: false, message: "Invalid role." });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE ${table} SET session_id = NULL, session_last_active = NULL WHERE id = $1`,
+      [id],
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully." });
+  } catch (err) {
+    console.error("logout error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };

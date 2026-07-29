@@ -109,7 +109,7 @@ export default function AttendanceOverview({
               onClick={() =>
                 setSortKey((k) => (k === "absent" ? "name" : "absent"))
               }
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border bg-blue-600 hover:bg-blue-700 text-white text-sm whitespace-nowrap"
               title="Toggle sort order"
             >
               <ArrowUpDown size={14} />

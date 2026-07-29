@@ -83,6 +83,7 @@ export default function AttendanceTab({
 
   // ── Derived
   const alreadySavedOnDate = (dayData[selectedDate]?.total ?? 0) > 0;
+  const isSundaySelected = new Date(selectedDate + "T00:00:00").getDay() === 0;
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm.trim()) return centerStudents;
@@ -110,10 +111,12 @@ export default function AttendanceTab({
   };
 
   const handleSelectDate = (date: string) => {
+    if (new Date(date + "T00:00:00").getDay() === 0) return;
     setSelectedDate(date);
   };
 
   const handleSave = async () => {
+    if (new Date(selectedDate + "T00:00:00").getDay() === 0) return;
     const recordsToSave = centerStudents.map((s) => ({
       studentId: s.id,
       status: attendance[s.id] ?? "absent",
@@ -162,6 +165,7 @@ export default function AttendanceTab({
             dayData={dayData}
             selectedDate={selectedDate}
             onSelectDate={handleSelectDate}
+            disableSundays
           />
 
           <div className="space-y-8">
@@ -180,16 +184,23 @@ export default function AttendanceTab({
                     },
                   )}
                 </h3>
-                {alreadySavedOnDate && (
-                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                    ✓ Already saved for this date — saving again will overwrite
+                {isSundaySelected ? (
+                  <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                    Attendance cannot be recorded on Sundays — pick another date
                   </span>
+                ) : (
+                  alreadySavedOnDate && (
+                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      ✓ Already saved for this date — saving again will
+                      overwrite
+                    </span>
+                  )
                 )}
               </div>
 
               <button
                 onClick={handleSave}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSundaySelected}
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
                 <Save size={20} />

@@ -18,8 +18,18 @@ import TicketTableSkeleton from "@/components/ui/TicketSkeleton";
 const ITEMS_PER_PAGE = 10;
 
 export default function AdminTickets() {
-  const { tickets, isLoading, deleteTicket, updateTicketStatus } =
-    useTicketStore();
+  const {
+    tickets,
+    isLoading,
+    deleteTicket,
+    updateTicketStatus,
+    markTicketsViewed,
+  } = useTicketStore();
+
+  // ── Effects: clear the sidebar's unseen-tickets badge on open
+  useEffect(() => {
+    markTicketsViewed();
+  }, [markTicketsViewed]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");

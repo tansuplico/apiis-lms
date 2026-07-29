@@ -1,7 +1,14 @@
 // src/services/apiClient.ts
 import { tokenStorage } from "./tokenStorage";
+import { navigateTo } from "./navigationService";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+
+const LOGIN_PATH_BY_ROLE: Record<string, string> = {
+  student: "/student/login",
+  facilitator: "/facilitator-admin/login",
+  admin: "/facilitator-admin/login",
+};
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -59,6 +66,16 @@ async function request<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401 && requiresAuth) {
+        const role = await tokenStorage.getRole();
+        await tokenStorage.clearToken();
+        navigateTo(
+          role
+            ? (LOGIN_PATH_BY_ROLE[role] ?? "/student/login")
+            : "/student/login",
+        );
+      }
+
       throw new ApiError(
         response.status,
         data.message ?? "Something went wrong.",

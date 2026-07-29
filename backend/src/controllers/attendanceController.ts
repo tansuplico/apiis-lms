@@ -24,6 +24,10 @@ const isFutureDate = (dateStr: string): boolean => {
   return date > nowManila;
 };
 
+const isSunday = (dateStr: string): boolean => {
+  return new Date(dateStr).getUTCDay() === 0;
+};
+
 // ── Get Attendance by Center
 export const getAttendanceByCenter = async (
   req: AuthRequest,
@@ -315,6 +319,14 @@ export const submitAttendance = async (req: AuthRequest, res: Response) => {
       res.status(400).json({
         success: false,
         message: "Cannot submit attendance for future dates.",
+      });
+      return;
+    }
+
+    if (isSunday(date)) {
+      res.status(400).json({
+        success: false,
+        message: "Cannot submit attendance for Sundays.",
       });
       return;
     }

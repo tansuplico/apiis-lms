@@ -4,18 +4,31 @@ import { Ticket, TicketStatus } from "@/types/types";
 import { apiClient } from "@/services/apiClient";
 import { toast } from "react-toastify";
 
+// Persisted across reloads so the "new tickets" badge reflects what the
+// admin has and hasn't opened the Tickets page for, not just this session.
+const LAST_VIEWED_STORAGE_KEY = "apiis-admin-tickets-last-viewed";
+
+const readLastViewedAt = (): number => {
+  const stored = localStorage.getItem(LAST_VIEWED_STORAGE_KEY);
+  const parsed = stored ? Number(stored) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 interface TicketStore {
   tickets: Ticket[];
   isLoading: boolean;
+  lastViewedAt: number;
   fetchTickets: () => Promise<void>;
   deleteTicket: (id: number) => Promise<void>;
   updateTicketStatus: (id: number, status: TicketStatus) => Promise<void>;
+  markTicketsViewed: () => void;
 }
 
 export const useTicketStore = create<TicketStore>()((set, get) => ({
   // ── State
   tickets: [],
   isLoading: false,
+  lastViewedAt: readLastViewedAt(),
 
   // ── Actions: fetch all tickets
   fetchTickets: async () => {
@@ -65,5 +78,13 @@ export const useTicketStore = create<TicketStore>()((set, get) => ({
       toast.error(err.message ?? "Failed to update ticket status.");
       throw err;
     }
+  },
+
+  // ── Actions: mark all currently-known tickets as seen (call when the
+  // admin opens the Tickets page) so the sidebar badge clears.
+  markTicketsViewed: () => {
+    const now = Date.now();
+    localStorage.setItem(LAST_VIEWED_STORAGE_KEY, String(now));
+    set({ lastViewedAt: now });
   },
 }));

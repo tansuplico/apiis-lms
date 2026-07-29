@@ -267,7 +267,7 @@ export default function FacilitatorAttendanceOverview({
       d.setDate(d.getDate() + 1)
     ) {
       const dayOfWeek = d.getDay(); // 0 = Sun, 6 = Sat
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+      if (dayOfWeek === 0) continue;
 
       const dateKey = toDateKey(d);
       const dayRecords = recordsByDate.get(dateKey) ?? [];
@@ -330,7 +330,7 @@ export default function FacilitatorAttendanceOverview({
 
     while (weekCursor <= dec31) {
       const week: (HeatmapCell | null)[] = [];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 6; i++) {
         const cellDate = new Date(weekCursor);
         cellDate.setDate(weekCursor.getDate() + i);
 
@@ -504,7 +504,7 @@ export default function FacilitatorAttendanceOverview({
                   onClick={() =>
                     setSortKey((k) => (k === "absent" ? "name" : "absent"))
                   }
-                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border bg-blue-600 hover:bg-blue-700 text-white text-sm whitespace-nowrap"
                   title="Toggle sort order"
                 >
                   <ArrowUpDown size={14} />
@@ -677,7 +677,7 @@ export default function FacilitatorAttendanceOverview({
                 <div className="flex gap-1">
                   {/* Row labels: Mon..Fri */}
                   <div className="flex flex-col gap-1 mr-1 w-7 shrink-0">
-                    {["Mon", "Tue", "Wed", "Thu", "Fri"].map((label) => (
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
                       <span
                         key={label}
                         className="h-3.25 text-[10px] leading-3.25 text-gray-500 dark:text-gray-400"
@@ -749,7 +749,6 @@ export default function FacilitatorAttendanceOverview({
               </span>
             </div>
           </div>
-
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
               <span>
@@ -770,21 +769,20 @@ export default function FacilitatorAttendanceOverview({
             <button
               onClick={handleExportCsv}
               disabled={sheetRows.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600  text-sm font-medium  disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download size={14} />
               Export CSV
             </button>
           </div>
-
+          tsx
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             A facilitator is marked Present on a day if they submitted at least
             one student attendance record that day, across any center. The time
             shown is when their earliest submission that day was recorded.
-            Weekends are excluded. Navigate months via the calendar in the
-            Student Attendance tab.
+            Sundays are excluded; Saturdays are counted. Navigate months via the
+            calendar in the Student Attendance tab.
           </p>
-
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left">

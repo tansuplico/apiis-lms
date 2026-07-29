@@ -9,17 +9,13 @@ export interface DayAttendanceSummary {
 }
 
 interface AttendanceCalendarProps {
-  /** Any date within the month currently displayed. */
   month: Date;
   onMonthChange: (next: Date) => void;
-  /** Keyed by 'YYYY-MM-DD'. Days without an entry are treated as "no session". */
   dayData: Record<string, DayAttendanceSummary>;
-  /** Currently selected date, 'YYYY-MM-DD'. Only used in picker mode. */
   selectedDate?: string;
-  /** Omit to render a read-only overview calendar. */
   onSelectDate?: (date: string) => void;
-  /** Blocks navigating to / selecting dates after today. Defaults to true. */
   disableFutureDates?: boolean;
+  disableSundays?: boolean;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -31,6 +27,7 @@ export default function AttendanceCalendar({
   selectedDate,
   onSelectDate,
   disableFutureDates = true,
+  disableSundays = false,
 }: AttendanceCalendarProps) {
   // ── Derived: grid of dates, padded to full weeks with adjacent-month days
   const year = month.getFullYear();
@@ -48,7 +45,8 @@ export default function AttendanceCalendar({
     const inCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
     const dateStr = formatDateString(date);
     const isFuture = dateStr > today;
-    return { date, dateStr, dayNumber, inCurrentMonth, isFuture };
+    const isSunday = date.getDay() === 0;
+    return { date, dateStr, dayNumber, inCurrentMonth, isFuture, isSunday };
   });
 
   const canGoNextMonth =
@@ -59,6 +57,28 @@ export default function AttendanceCalendar({
   // ── Handlers
   const goPrevMonth = () => onMonthChange(new Date(year, monthIndex - 1, 1));
   const goNextMonth = () => onMonthChange(new Date(year, monthIndex + 1, 1));
+
+  // ── Year select: range from (current year - 5) through current year,
+  // widened to include the displayed year in case it falls outside that window
+  const currentYearNow = new Date().getFullYear();
+  const earliestYear = Math.min(year, currentYearNow - 5);
+  const yearOptions = Array.from(
+    { length: currentYearNow - earliestYear + 1 },
+    (_, i) => earliestYear + i,
+  );
+
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newYear = Number(e.target.value);
+    let targetMonthIndex = monthIndex;
+    // Clamp to the current month if jumping to this year would land on a disallowed future month
+    if (disableFutureDates) {
+      const now = new Date();
+      if (newYear === now.getFullYear() && monthIndex > now.getMonth()) {
+        targetMonthIndex = now.getMonth();
+      }
+    }
+    onMonthChange(new Date(newYear, targetMonthIndex, 1));
+  };
 
   // ── Helpers: color a cell by that day's present-rate
   const cellTone = (summary: DayAttendanceSummary | undefined) => {
@@ -81,12 +101,23 @@ export default function AttendanceCalendar({
         >
           <ChevronLeft size={18} />
         </button>
-        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {month.toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          })}
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {month.toLocaleDateString("en-US", { month: "long" })}
+          </h4>
+          <select
+            value={year}
+            onChange={handleYearChange}
+            aria-label="Select year"
+            className="text-sm font-medium bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 text-gray-900 dark:text-white cursor-pointer"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={goNextMonth}
           disabled={!canGoNextMonth}
@@ -110,48 +141,68 @@ export default function AttendanceCalendar({
 
       {/* Day grid */}
       <div className="grid grid-cols-7 gap-1.5">
-        {cells.map(({ date, dateStr, dayNumber, inCurrentMonth, isFuture }) => {
-          const summary = dayData[dateStr];
-          const isSelected = selectedDate === dateStr;
-          const isSelectable =
-            !!onSelectDate &&
-            inCurrentMonth &&
-            !(disableFutureDates && isFuture);
-          const isClickable =
-            isSelectable || (!onSelectDate && summary && summary.total > 0);
+        {cells.map(
+          ({
+            date,
+            dateStr,
+            dayNumber,
+            inCurrentMonth,
+            isFuture,
+            isSunday,
+          }) => {
+            const summary = dayData[dateStr];
+            const isSelected = selectedDate === dateStr;
+            const isSelectable =
+              !!onSelectDate &&
+              inCurrentMonth &&
+              !(disableFutureDates && isFuture) &&
+              !(disableSundays && isSunday);
+            const isClickable =
+              isSelectable || (!onSelectDate && summary && summary.total > 0);
 
-          return (
-            <button
-              key={dateStr + dayNumber}
-              type="button"
-              disabled={!isClickable}
-              onClick={() => {
-                if (onSelectDate && isSelectable) onSelectDate(dateStr);
-              }}
-              className={`relative aspect-square rounded-lg text-sm flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                !inCurrentMonth ? "opacity-30" : cellTone(summary)
-              } ${isSelected ? "ring-2 ring-blue-500" : ""} ${
-                isClickable
-                  ? "cursor-pointer hover:brightness-95 dark:hover:brightness-110"
-                  : "cursor-default"
-              } ${disableFutureDates && isFuture && inCurrentMonth ? "opacity-40" : ""}`}
-              title={
-                summary && summary.total > 0
-                  ? `${summary.present} present, ${summary.absent} absent`
-                  : undefined
-              }
-            >
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                {date.getDate()}
-              </span>
-              {summary && summary.total > 0 && (
-                <span className="text-[10px] leading-none text-gray-600 dark:text-gray-400">
-                  {summary.present}/{summary.total}
+            return (
+              <button
+                key={dateStr + dayNumber}
+                type="button"
+                disabled={!isClickable}
+                onClick={() => {
+                  if (onSelectDate && isSelectable) onSelectDate(dateStr);
+                }}
+                className={`relative aspect-square rounded-lg text-sm flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  !inCurrentMonth ? "opacity-30" : cellTone(summary)
+                } ${isSelected ? "ring-2 ring-blue-500" : ""} ${
+                  isClickable
+                    ? "cursor-pointer hover:brightness-95 dark:hover:brightness-110"
+                    : "cursor-default"
+                } ${
+                  (disableFutureDates && isFuture && inCurrentMonth) ||
+                  (disableSundays &&
+                    isSunday &&
+                    inCurrentMonth &&
+                    !!onSelectDate)
+                    ? "opacity-40"
+                    : ""
+                }`}
+                title={
+                  disableSundays && isSunday && !!onSelectDate
+                    ? "Attendance cannot be recorded on Sundays"
+                    : summary && summary.total > 0
+                      ? `${summary.present} present, ${summary.absent} absent`
+                      : undefined
+                }
+              >
+                <span className="font-medium text-gray-800 dark:text-gray-200">
+                  {date.getDate()}
                 </span>
-              )}
-            </button>
-          );
-        })}
+                {summary && summary.total > 0 && (
+                  <span className="text-[10px] leading-none text-gray-600 dark:text-gray-400">
+                    {summary.present}/{summary.total}
+                  </span>
+                )}
+              </button>
+            );
+          },
+        )}
       </div>
 
       {/* Legend */}

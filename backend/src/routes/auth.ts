@@ -6,6 +6,7 @@ import {
   facilitatorLogin,
   adminLogin,
   changePassword,
+  logout,
   forgotPassword,
   resetPasswordWithCode,
 } from "../controllers/authController";
@@ -53,5 +54,6 @@ router.post(
   passwordChangeLimiter,
   changePassword,
 );
+router.post("/logout", authenticate, logout);
 
 export default router;

@@ -12,13 +12,25 @@ import {
   Library,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import SettingsModal from "@/components/shared/SettingsModal";
+import { useTicketStore } from "@/stores/useTicketStore";
 import logo from "@/assets/logo.png";
 
 export default function AdminSidebar() {
   // ── State
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  // ── Unseen tickets: any ticket created after the admin last opened the
+  // Tickets page counts as "new". Capped visually at 9+.
+  const tickets = useTicketStore((s) => s.tickets);
+  const lastViewedAt = useTicketStore((s) => s.lastViewedAt);
+  const newTicketCount = useMemo(
+    () =>
+      tickets.filter((t) => new Date(t.createdAt).getTime() > lastViewedAt)
+        .length,
+    [tickets, lastViewedAt],
+  );
 
   // ── Render
   return (
@@ -138,11 +150,21 @@ export default function AdminSidebar() {
                   }`
                 }
               >
-                <MessageSquare
-                  size={26}
-                  strokeWidth={1.6}
-                  className="text-gray-600 dark:text-gray-400"
-                />
+                <span className="relative shrink-0">
+                  <MessageSquare
+                    size={26}
+                    strokeWidth={1.6}
+                    className="text-gray-600 dark:text-gray-400"
+                  />
+                  {newTicketCount > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-4.5 h-4.5 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none ring-2 ring-gray-50 dark:ring-gray-950"
+                      aria-label={`${newTicketCount} new ticket${newTicketCount === 1 ? "" : "s"}`}
+                    >
+                      {newTicketCount > 9 ? "9+" : newTicketCount}
+                    </span>
+                  )}
+                </span>
                 <span>Tickets</span>
               </NavLink>
             </li>

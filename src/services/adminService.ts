@@ -24,7 +24,14 @@ export const adminService = {
   },
 
   logout: async () => {
-    await tokenStorage.clearToken();
+    try {
+      await apiClient.post("/auth/logout", {});
+    } catch {
+      // Best-effort — proceed to clear the local token regardless (e.g.
+      // offline, or the session was already invalidated server-side).
+    } finally {
+      await tokenStorage.clearToken();
+    }
   },
 
   changePassword: async (currentPassword: string, newPassword: string) => {

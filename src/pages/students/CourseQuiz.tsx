@@ -111,18 +111,18 @@ export default function CourseQuiz() {
   );
 
   const alreadyCompleted =
-    currentStudent?.courseProgress[course.id]?.completedParts.includes(
+    currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
       currentPartSlug ?? "",
     ) ?? false;
 
   const quizKey = `${modNum}:quiz`;
   const alreadyCompletedQuiz =
-    currentStudent?.courseProgress[course.id]?.completedParts.includes(
+    currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
       quizKey,
     ) ?? false;
 
   const savedAnswers =
-    currentStudent?.courseProgress[course.id]?.quizAnswers?.[modNum] ?? {};
+    currentStudent?.courseProgress?.[course.id]?.quizAnswers?.[modNum] ?? {};
 
   const restoredScore = questions.filter((q) =>
     isQuestionCorrect(q, savedAnswers[q.id] as StudentAnswer),

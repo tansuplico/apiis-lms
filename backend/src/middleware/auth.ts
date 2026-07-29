@@ -1,10 +1,21 @@
 // src/middleware/auth.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import pool from "../config/db";
 
 // ── Types & Constants
 const VALID_ROLES = ["student", "facilitator", "admin"] as const;
 type Role = (typeof VALID_ROLES)[number];
+
+const ROLE_TABLE_MAP: Record<Role, string> = {
+  student: "students",
+  facilitator: "facilitators",
+  admin: "admins",
+};
+
+// Only bump session_last_active this often — avoids a DB write on every
+// single authenticated request when a user is actively clicking around.
+const ACTIVITY_UPDATE_THROTTLE_MS = 60 * 1000;
 
 export interface AuthRequest extends Omit<Request, "file"> {
   user?: {
@@ -25,7 +36,7 @@ export interface AuthRequest extends Omit<Request, "file"> {
   files?: any;
 }
 // ── authenticate middleware
-export const authenticate = (
+export const authenticate = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction,
@@ -57,6 +68,7 @@ export const authenticate = (
     const decoded = jwt.verify(token, secret) as {
       id: number;
       role: Role;
+      sessionId?: string;
       exp: number;
     };
 
@@ -77,6 +89,40 @@ export const authenticate = (
         .status(401)
         .json({ success: false, message: "Invalid token payload." });
       return;
+    }
+
+    // Tokens issued before single-session enforcement shipped won't carry a
+    // sessionId — treat those as invalid so everyone re-authenticates once.
+    if (!decoded.sessionId) {
+      res.status(401).json({ success: false, message: "Please log in again." });
+      return;
+    }
+
+    const table = ROLE_TABLE_MAP[decoded.role];
+    const sessionResult = await pool.query(
+      `SELECT session_id, session_last_active FROM ${table} WHERE id = $1`,
+      [decoded.id],
+    );
+    const sessionRow = sessionResult.rows[0];
+
+    if (!sessionRow || sessionRow.session_id !== decoded.sessionId) {
+      res.status(401).json({
+        success: false,
+        message:
+          "You've been logged out because this account was signed in on another device.",
+      });
+      return;
+    }
+
+    const lastActiveMs = sessionRow.session_last_active
+      ? new Date(sessionRow.session_last_active).getTime()
+      : 0;
+
+    if (Date.now() - lastActiveMs > ACTIVITY_UPDATE_THROTTLE_MS) {
+      await pool.query(
+        `UPDATE ${table} SET session_last_active = NOW() WHERE id = $1`,
+        [decoded.id],
+      );
     }
 
     req.user = {

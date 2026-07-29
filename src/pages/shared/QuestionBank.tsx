@@ -1,5 +1,5 @@
 // src/pages/admins/QuestionBank.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Plus,
@@ -15,6 +15,7 @@ import {
   ToggleLeft,
   ArrowLeftRight,
   Check,
+  Search,
 } from "lucide-react";
 import {
   BankQuestion,
@@ -106,6 +107,18 @@ export default function QuestionBank() {
       (localStorage.getItem("qb-collection-view") as "grid" | "list") || "grid",
   );
 
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
+
+  const filteredCollections = useMemo(() => {
+    const query = collectionSearchQuery.trim().toLowerCase();
+    if (query.length === 0) return collections;
+    return collections.filter(
+      (c) =>
+        c.name.toLowerCase().includes(query) ||
+        (c.description ?? "").toLowerCase().includes(query),
+    );
+  }, [collections, collectionSearchQuery]);
+
   const changeViewMode = (mode: "grid" | "list") => {
     setViewMode(mode);
     localStorage.setItem("qb-collection-view", mode);
@@ -113,6 +126,19 @@ export default function QuestionBank() {
 
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<QuizQuestionType | "all">("all");
+
+  const filteredQuestions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return questions.filter((q) => {
+      const matchesType = typeFilter === "all" || q.type === typeFilter;
+      const matchesQuery =
+        query.length === 0 || q.question.toLowerCase().includes(query);
+      return matchesType && matchesQuery;
+    });
+  }, [questions, searchQuery, typeFilter]);
 
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<DraftQuestion>(
@@ -162,7 +188,11 @@ export default function QuestionBank() {
     }
   };
 
-  const openCollection = (c: QuizBankCollection) => setActiveCollection(c);
+  const openCollection = (c: QuizBankCollection) => {
+    setSearchQuery("");
+    setTypeFilter("all");
+    setActiveCollection(c);
+  };
   const backToCollections = () => {
     setActiveCollection(null);
     setQuestions([]);
@@ -410,10 +440,6 @@ export default function QuestionBank() {
             <h3 className="text-4xl text-gray-900 dark:text-white">
               Question Bank
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Collections of reusable questions. Any quiz can pull from any
-              collection.
-            </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
@@ -450,6 +476,31 @@ export default function QuestionBank() {
           </div>
         </div>
 
+        {collections.length > 0 && (
+          <div className="relative mb-6 max-w-md">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={collectionSearchQuery}
+              onChange={(e) => setCollectionSearchQuery(e.target.value)}
+              placeholder="Search collections..."
+              className="w-full pl-9 pr-9 py-2.5 border outline-none rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
+            />
+            {collectionSearchQuery && (
+              <button
+                onClick={() => setCollectionSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                aria-label="Clear search"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        )}
+
         {collectionsLoading && collections.length === 0 ? (
           viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -468,9 +519,13 @@ export default function QuestionBank() {
           <p className="text-gray-500 dark:text-gray-400">
             No collections yet. Create one to start adding questions.
           </p>
+        ) : filteredCollections.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400">
+            No collections match your search.
+          </p>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {collections.map((c) => (
+            {filteredCollections.map((c) => (
               <div
                 key={c.id}
                 className="rounded-lg bg-white dark:bg-gray-800 overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
@@ -527,7 +582,7 @@ export default function QuestionBank() {
           </div>
         ) : (
           <div className="rounded-lg divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden shadow-sm bg-white dark:bg-gray-800">
-            {collections.map((c) => (
+            {filteredCollections.map((c) => (
               <div
                 key={c.id}
                 className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
@@ -678,6 +733,49 @@ export default function QuestionBank() {
         </button>
       </div>
 
+      {questions.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search questions..."
+              className="w-full pl-9 pr-9 py-2.5 border outline-none rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                aria-label="Clear search"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) =>
+              setTypeFilter(e.target.value as QuizQuestionType | "all")
+            }
+            className="px-3 py-2.5 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600 sm:w-56 shrink-0"
+          >
+            <option value="all">All types</option>
+            {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
+              (type) => (
+                <option key={type} value={type}>
+                  {QUESTION_TYPE_LABELS[type]}
+                </option>
+              ),
+            )}
+          </select>
+        </div>
+      )}
+
       {questionsLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -688,9 +786,13 @@ export default function QuestionBank() {
         <p className="text-gray-500 dark:text-gray-400">
           No questions in this collection yet.
         </p>
+      ) : filteredQuestions.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400">
+          No questions match your search or filter.
+        </p>
       ) : (
         <div className="space-y-3">
-          {questions.map((q) => (
+          {filteredQuestions.map((q) => (
             <div
               key={q.id}
               className="p-4 rounded-lg bg-white dark:bg-gray-800 flex items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow"

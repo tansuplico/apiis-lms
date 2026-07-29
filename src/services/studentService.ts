@@ -38,7 +38,14 @@ export const studentService = {
   },
 
   logout: async (): Promise<void> => {
-    await tokenStorage.clearToken();
+    try {
+      await apiClient.post("/auth/logout", {});
+    } catch {
+      // Best-effort — proceed to clear the local token regardless (e.g.
+      // offline, or the session was already invalidated server-side).
+    } finally {
+      await tokenStorage.clearToken();
+    }
   },
 
   changePassword: async (

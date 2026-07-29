@@ -179,18 +179,28 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       return true;
     } catch (err) {
       console.error("Post-login initialization failed:", err);
+      // TEMP DEBUG — remove once the forced-password-change issue is confirmed fixed
+      toast.error(`[DEBUG] login: fell into catch — ${String(err)}`, {
+        autoClose: false,
+      });
       toast.error(
         "Signed in, but couldn't load your data. Some info may be out of date until you're back online.",
       );
 
+      const fallbackStudent: Student = {
+        ...student,
+        courseProgress: student.courseProgress ?? {},
+        accessoriesOwned: student.accessoriesOwned ?? [],
+      };
+
       try {
-        await saveLocalSession(student);
+        await saveLocalSession(fallbackStudent);
       } catch {
         // best-effort only; not fatal to login
       }
 
       set({
-        currentStudent: student,
+        currentStudent: fallbackStudent,
         isAuthenticated: true,
       });
 
