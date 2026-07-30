@@ -30,6 +30,7 @@ import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkelet
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
+import { useSearchParams } from "react-router-dom";
 
 const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
@@ -100,8 +101,11 @@ export default function QuestionBank() {
     fetchCollections,
   } = useQuizBankCollectionStore();
 
-  const [activeCollection, setActiveCollection] =
-    useState<QuizBankCollection | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCollectionId = searchParams.get("collection");
+  const activeCollection = activeCollectionId
+    ? (collections.find((c) => c.id === Number(activeCollectionId)) ?? null)
+    : null;
   const [viewMode, setViewMode] = useState<"grid" | "list">(
     () =>
       (localStorage.getItem("qb-collection-view") as "grid" | "list") || "grid",
@@ -172,7 +176,11 @@ export default function QuestionBank() {
   }, []);
 
   useEffect(() => {
-    if (activeCollection) loadQuestions(activeCollection.id);
+    if (activeCollection) {
+      loadQuestions(activeCollection.id);
+    } else {
+      setQuestions([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCollection?.id]);
 
@@ -191,12 +199,10 @@ export default function QuestionBank() {
   const openCollection = (c: QuizBankCollection) => {
     setSearchQuery("");
     setTypeFilter("all");
-    setActiveCollection(c);
+    setSearchParams({ collection: String(c.id) });
   };
-  const backToCollections = () => {
-    setActiveCollection(null);
-    setQuestions([]);
-  };
+
+  const backToCollections = () => setSearchParams({});
 
   const startCreateCollection = () => {
     setCollectionDraft({ name: "", description: "" });
@@ -221,13 +227,13 @@ export default function QuestionBank() {
         await quizBankCollectionService.create(collectionDraft);
         toast.success("Collection created.");
       } else if (collectionModalMode) {
-        const updated = await quizBankCollectionService.update(
+        await quizBankCollectionService.update(
           collectionModalMode.id,
           collectionDraft,
         );
         toast.success("Collection renamed.");
-        if (activeCollection?.id === updated.id) setActiveCollection(updated);
       }
+      await fetchCollections();
       setCollectionModalMode(null);
     } catch (err) {
       toast.error(

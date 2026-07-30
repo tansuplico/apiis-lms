@@ -5,7 +5,7 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import { toast } from "react-toastify";
 import { COURSE_CATEGORIES } from "@/data/courseCategories";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { tokenStorage } from "@/services/tokenStorage";
+import { authHeaders } from "@/services/authHeadersService";
 import { extractThumbnailFilename } from "@/utils/thumbnailHelper";
 import { resolveThumbnailUrl } from "@/utils/imageUtils";
 import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
@@ -58,13 +58,13 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
 
     setUploading(true);
     try {
-      const token = await tokenStorage.getToken();
+      const headers = await authHeaders();
       const formData = new FormData();
       formData.append("thumbnail", file);
 
       const res = await fetch(`${BASE_URL}/api/thumbnails`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers,
         body: formData,
       });
 
@@ -77,7 +77,7 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
       if (previousFilename) {
         fetch(`${BASE_URL}/api/thumbnails/${previousFilename}`, {
           method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers,
         }).catch(() => {
           // Best-effort — a failed cleanup here is just an orphaned file.
         });

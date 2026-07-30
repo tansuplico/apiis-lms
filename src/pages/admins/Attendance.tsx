@@ -6,6 +6,7 @@ import { useCenterStore } from "@/stores/useCenterStore";
 import { useFacilitatorListStore } from "@/stores/useFacilitatorListStore";
 import AttendanceOverview from "@/components/shared/AttendanceOverview";
 import FacilitatorAttendanceOverview from "@/components/shared/FacilitatorAttendanceOverview";
+import { useSearchParams } from "react-router-dom";
 
 type Mode = "center" | "facilitator";
 
@@ -16,7 +17,6 @@ export default function AttendanceRecords() {
   const { facilitators } = useFacilitatorListStore();
 
   // ── State: which mode + which center/facilitator is being viewed
-  const [mode, setMode] = useState<Mode>("center");
   const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
   const [selectedFacilitatorId, setSelectedFacilitatorId] = useState<
     number | null
@@ -24,9 +24,14 @@ export default function AttendanceRecords() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // ── Effects: default to the first center / facilitator once loaded.
-  // Admins see ALL centers here (unlike the facilitator page, which only
-  // shows centers that facilitator is assigned to).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode = (searchParams.get("mode") as Mode) ?? "center";
+
+  const handleModeChange = (next: Mode) => {
+    setSearchParams({ mode: next });
+    setIsDropdownOpen(false);
+  };
+
   useEffect(() => {
     if (selectedCenterId === null && centers.length > 0) {
       setSelectedCenterId(centers[0].id);
@@ -57,12 +62,6 @@ export default function AttendanceRecords() {
   const selectedFacilitator = facilitators.find(
     (f) => f.id === selectedFacilitatorId,
   );
-
-  // ── Handlers
-  const handleModeChange = (next: Mode) => {
-    setMode(next);
-    setIsDropdownOpen(false);
-  };
 
   // ── Guard: not logged in
   if (!currentAdmin) {

@@ -12,7 +12,6 @@ import {
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import StudentAttendanceModal from "./StudentAttendanceModal";
-import { parseDateKey } from "@/utils/dateformatter";
 
 interface FacilitatorAttendanceOverviewProps {
   facilitatorId: number;
@@ -68,12 +67,27 @@ const toDateKey = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+// Inverse of toDateKey. NEVER use `new Date(dateKey)` directly on a
+// "yyyy-MM-dd" string — the built-in parser treats that as UTC midnight,
+// which shifts the displayed local date by a day in negative-UTC-offset
+// timezones (the exact bug this app already had on the write side once).
+const parseDateKey = (dateKey: string): Date => {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 const startOfDay = (d: Date) => {
   const copy = new Date(d);
   copy.setHours(0, 0, 0, 0);
   return copy;
 };
 
+// ── CSV export: builds the CSV text only. Saving to disk uses the same
+// pattern as fileService.ts's course-content file download — the browser's
+// native File System Access API (showSaveFilePicker), which WebView2
+// (Chromium-based, used by Tauri on Windows) supports directly with no
+// Tauri plugin involved. Falls back to a blob + <a download> for
+// engines that don't support it, same as fileService.ts.
 const buildCsvContent = (rows: FacilitatorSheetRow[]) => {
   const escape = (value: string) =>
     value.includes(",") || value.includes('"')
@@ -104,8 +118,7 @@ export default function FacilitatorAttendanceOverview({
   const navigate = useNavigate();
 
   // ── Store
-  const { records, getAttendanceByFacilitator, isLoading } =
-    useAttendanceStore();
+  const { records, getAttendanceByFacilitator } = useAttendanceStore();
 
   // ── State
   const [activeTab, setActiveTab] = useState<Tab>("students");
@@ -123,9 +136,20 @@ export default function FacilitatorAttendanceOverview({
   // ── Effects: load this facilitator's full history (no center-scoped
   // summary endpoint exists for facilitators, so everything below is
   // computed client-side from the raw records instead).
+  // `loadedFacilitatorId` tracks which facilitator's data has actually
+  // finished loading fresh, so switching facilitators doesn't briefly
+  // flash stale cached records left over from a previous selection
+  // before the real fetch resolves.
+  const [loadedFacilitatorId, setLoadedFacilitatorId] = useState<number | null>(
+    null,
+  );
   useEffect(() => {
-    getAttendanceByFacilitator(facilitatorId);
+    setLoadedFacilitatorId(null);
+    getAttendanceByFacilitator(facilitatorId).finally(() => {
+      setLoadedFacilitatorId(facilitatorId);
+    });
   }, [facilitatorId]);
+  const isCurrentDataReady = loadedFacilitatorId === facilitatorId;
 
   // ── Derived: this facilitator's records only (store holds records for
   // whichever centers/facilitators have been fetched so far, merged together)
@@ -525,7 +549,7 @@ export default function FacilitatorAttendanceOverview({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {isLoading && filteredSummary.length === 0 ? (
+                    {!isCurrentDataReady ? (
                       <tr>
                         <td
                           colSpan={6}
@@ -789,7 +813,7 @@ export default function FacilitatorAttendanceOverview({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {isLoading && sheetRows.length === 0 ? (
+                  {!isCurrentDataReady ? (
                     <tr>
                       <td
                         colSpan={4}

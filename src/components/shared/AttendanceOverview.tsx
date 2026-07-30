@@ -22,7 +22,7 @@ export default function AttendanceOverview({
   const navigate = useNavigate();
 
   // ── Store
-  const { records, getAttendanceByCenter, summary, isLoading, fetchSummary } =
+  const { records, getAttendanceByCenter, summary, fetchSummary } =
     useAttendanceStore();
 
   // ── State
@@ -35,11 +35,21 @@ export default function AttendanceOverview({
     name: string;
   } | null>(null);
 
-  // ── Effects: load full history (for calendar) + all-time summary (for absence totals)
+  // ── Effects: load full history (for calendar) + all-time summary (for
+  // absence totals). `loadedCenterId` tracks which center's data has
+  // actually finished loading fresh, so switching centers doesn't briefly
+  // flash the previous center's summary (fetchSummary replaces `summary`
+  // wholesale in the store, with no per-center filtering) before the real
+  // fetch for the newly selected center resolves.
+  const [loadedCenterId, setLoadedCenterId] = useState<number | null>(null);
   useEffect(() => {
-    getAttendanceByCenter(centerId);
-    fetchSummary(centerId);
+    setLoadedCenterId(null);
+    Promise.all([
+      getAttendanceByCenter(centerId),
+      fetchSummary(centerId),
+    ]).finally(() => setLoadedCenterId(centerId));
   }, [centerId]);
+  const isCurrentDataReady = loadedCenterId === centerId;
 
   // ── Derived: per-day present/absent totals for the calendar
   const dayData = useMemo(() => {
@@ -141,7 +151,7 @@ export default function AttendanceOverview({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {isLoading && filteredSummary.length === 0 ? (
+                {!isCurrentDataReady ? (
                   <tr>
                     <td
                       colSpan={5}
