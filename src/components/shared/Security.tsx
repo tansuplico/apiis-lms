@@ -47,6 +47,7 @@ export default function Security({ role }: SecurityProps) {
     confirm: "",
   });
   const online = useOnlineStatus();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // ── Handlers
   const handleChangePassword = async () => {
@@ -91,7 +92,7 @@ export default function Security({ role }: SecurityProps) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!isOnline()) {
       toast.warning(
         "You're offline. Logging out will require internet to log back in.",
@@ -101,7 +102,14 @@ export default function Security({ role }: SecurityProps) {
       );
       return;
     }
-    logout();
+
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handlePinInput =
@@ -198,10 +206,37 @@ export default function Security({ role }: SecurityProps) {
 
         <button
           onClick={handleLogout}
-          disabled={!online}
-          className="w-full bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium cursor-pointer"
+          disabled={!online || isLoggingOut}
+          className="w-full bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium flex items-center justify-center gap-2"
         >
-          Log out
+          {isLoggingOut ? (
+            <>
+              <svg
+                className="w-5 h-5 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+
+              <span>Logging out...</span>
+            </>
+          ) : (
+            "Log out"
+          )}
         </button>
       </div>
     </div>

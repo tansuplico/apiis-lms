@@ -10,7 +10,7 @@ import {
   ChartBar,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useDebounce } from "@/hooks/useDebounce";
 
 import ViewCenterGridCard from "@/components/shared/ViewCenterGridCard";
@@ -37,9 +37,19 @@ export default function ViewCenter() {
   // ── State: UI
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [modalViewMode, setModalViewMode] = useState<"grid" | "list">("grid");
-  const [activeTab, setActiveTab] = useState<
-    "courses" | "students" | "attendance" | "progress"
-  >("courses");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab =
+    (searchParams.get("tab") as
+      | "courses"
+      | "students"
+      | "attendance"
+      | "progress") ?? "courses";
+
+  const setActiveTab = (
+    tab: "courses" | "students" | "attendance" | "progress",
+  ) => {
+    setSearchParams({ tab });
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [modalSearchTerm, setModalSearchTerm] = useState("");
@@ -262,7 +272,7 @@ export default function ViewCenter() {
       {activeTab === "attendance" && (
         <AttendanceTab
           centerId={currentCenter.id}
-          centerName={centerTitle}   
+          centerName={centerTitle}
           centerStudents={centerStudents}
         />
       )}

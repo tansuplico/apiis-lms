@@ -12,6 +12,7 @@ export default function StudentLoginForm() {
   // ── State
   const [idNumber, setIdNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // ── Helpers: ID formatting
   const formatStudentId = (value: string) => {
@@ -29,17 +30,23 @@ export default function StudentLoginForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const success = await login(idNumber.trim(), password.trim());
+    setIsLoggingIn(true);
 
-    if (success) {
-      const { currentStudent } = useStudentStore.getState();
+    try {
+      const success = await login(idNumber.trim(), password.trim());
 
-      if (currentStudent?.mustChangePassword) {
-        navigate("/change-password", { replace: true });
-      } else {
-        toast.success("Login successful!");
-        navigate("/student/dashboard", { replace: true });
+      if (success) {
+        const { currentStudent } = useStudentStore.getState();
+
+        if (currentStudent?.mustChangePassword) {
+          navigate("/change-password", { replace: true });
+        } else {
+          toast.success("Login successful!");
+          navigate("/student/dashboard", { replace: true });
+        }
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -91,9 +98,37 @@ export default function StudentLoginForm() {
 
       <button
         type="submit"
-        className="w-full py-3 px-4 bg-[#0070FF] text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+        disabled={isLoggingIn}
+        className="w-full py-3 px-4 bg-[#0070FF] text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        Login
+        {isLoggingIn ? (
+          <>
+            <svg
+              className="w-5 h-5 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+
+            <span>Logging in...</span>
+          </>
+        ) : (
+          "Login"
+        )}
       </button>
     </form>
   );
