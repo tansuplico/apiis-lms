@@ -8,3 +8,8 @@ export const formatDateString = (date: Date): string => {
 export const getLocalDateString = (): string => {
   return formatDateString(new Date());
 };
+
+export const parseDateKey = (dateKey: string): Date => {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};

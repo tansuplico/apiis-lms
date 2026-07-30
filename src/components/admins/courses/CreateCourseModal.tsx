@@ -8,12 +8,12 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { tokenStorage } from "@/services/tokenStorage";
 import { extractThumbnailFilename } from "@/utils/thumbnailHelper";
 import { resolveThumbnailUrl } from "@/utils/imageUtils";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 
 interface CreateCourseModalProps {
   onClose: () => void;
 }
 
-// const BASE_URL = (import.meta.env.VITE_API_URL as string).replace("/api", "");
 const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");
 const getLevelColor = (level: string) => {
   switch (level) {
@@ -69,13 +69,10 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
       });
 
       const json = await res.json();
-      if (!res.ok || !json.success)
+      if (!res.ok || !json.success) {
+        await handleUnauthorizedResponse(res.status);
         throw new Error(json.message ?? "Upload failed.");
-
-      // Admin changed their mind before submitting — delete the previous
-      // upload from this same create session so it doesn't sit orphaned.
-      // Nothing references it yet (no course exists), so this is safe to
-      // do immediately, unlike the edit flow which sequences after a save.
+      }
       const previousFilename = extractThumbnailFilename(thumbnailUrl);
       if (previousFilename) {
         fetch(`${BASE_URL}/api/thumbnails/${previousFilename}`, {

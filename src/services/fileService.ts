@@ -1,12 +1,9 @@
-import { tokenStorage } from "@/services/tokenStorage";
+import { authHeaders } from "@/services/authHeadersService";
+import { ApiError } from "@/services/apiClient";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import { ModuleFile } from "@/types/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
-
-async function authHeaders() {
-  const token = await tokenStorage.getToken();
-  return { Authorization: `Bearer ${token}` };
-}
 
 export const fileService = {
   upload: async (
@@ -26,7 +23,10 @@ export const fileService = {
     });
 
     const data = await res.json();
-    if (!data.success) throw new Error(data.message ?? "Upload failed.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, data.message ?? "Upload failed.");
+    }
 
     return {
       id: data.data.id,
@@ -46,7 +46,10 @@ export const fileService = {
     });
 
     const data = await res.json();
-    if (!data.success) throw new Error(data.message ?? "Delete failed.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, data.message ?? "Delete failed.");
+    }
   },
 
   download: async (fileId: number, originalFilename: string): Promise<void> => {
@@ -56,7 +59,10 @@ export const fileService = {
     const res = await fetch(`${base}/api/files/${fileId}/download`, {
       headers,
     });
-    if (!res.ok) throw new Error("Download failed.");
+    if (!res.ok) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, "Download failed.");
+    }
 
     const blob = await res.blob();
 

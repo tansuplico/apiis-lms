@@ -1,12 +1,10 @@
 // src/components/auth/FaciAdminLoginForm.tsx
-import { ApiError } from "@/services/apiClient";
+import { apiClient, ApiError } from "@/services/apiClient";
 import { useAdminStore } from "@/stores/useAdminStore";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-
-const BASE_URL = import.meta.env.VITE_API_URL as string;
 
 type ForgotStep = "login" | "request" | "reset";
 
@@ -94,15 +92,11 @@ export default function FaciAdminLoginForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resetEmail.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message ?? "Something went wrong.");
-      }
+      await apiClient.post(
+        "/auth/forgot-password",
+        { email: resetEmail.trim() },
+        false,
+      );
       toast.success("If that email exists, a code has been sent.");
       setCooldown(60);
       setStep("reset");
@@ -123,19 +117,11 @@ export default function FaciAdminLoginForm() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${BASE_URL}/auth/reset-password-with-code`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: resetEmail.trim(),
-          code: code.trim(),
-          newPassword,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message ?? "Something went wrong.");
-      }
+      await apiClient.post(
+        "/auth/reset-password-with-code",
+        { email: resetEmail.trim(), code: code.trim(), newPassword },
+        false,
+      );
       toast.success("Password reset. You can now log in.");
       setStep("login");
       setCode("");

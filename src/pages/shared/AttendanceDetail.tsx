@@ -1,4 +1,4 @@
-// src/pages/admins/AttendanceDetail.tsx
+// src/pages/shared/AttendanceDetail.tsx
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { useCenterStore } from "@/stores/useCenterStore";
@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import StudentAvatar from "@/components/shared/StudentAvatar";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { parseDateKey } from "@/utils/dateformatter";
 
 export default function AttendanceDetail() {
   const { attendanceId } = useParams();
@@ -111,7 +112,7 @@ export default function AttendanceDetail() {
           </button>
           <div>
             <h1 className="text-3xl text-gray-900 dark:text-white">
-              {new Date(session.date).toLocaleDateString("en-US", {
+              {parseDateKey(session.date).toLocaleDateString("en-US", {
                 weekday: "long",
                 month: "long",
                 day: "numeric",

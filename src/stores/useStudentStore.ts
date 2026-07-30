@@ -179,13 +179,12 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       return true;
     } catch (err) {
       console.error("Post-login initialization failed:", err);
-      // TEMP DEBUG — remove once the forced-password-change issue is confirmed fixed
-      toast.error(`[DEBUG] login: fell into catch — ${String(err)}`, {
-        autoClose: false,
-      });
-      toast.error(
-        "Signed in, but couldn't load your data. Some info may be out of date until you're back online.",
-      );
+
+      if (err instanceof ApiError && err.statusCode === 401) {
+        set({ currentStudent: null, isAuthenticated: false });
+        toast.error("Something went wrong signing you in. Please try again.");
+        return false;
+      }
 
       const fallbackStudent: Student = {
         ...student,

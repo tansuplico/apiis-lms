@@ -13,6 +13,7 @@ import { toast } from "react-toastify";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
 import { useCenterStore } from "@/stores/useCenterStore";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
+import { parseDateKey } from "@/utils/dateformatter";
 
 export default function Dashboard() {
   // ── Store
@@ -73,7 +74,10 @@ export default function Dashboard() {
         date,
         records: recs,
       }))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort(
+        (a, b) =>
+          parseDateKey(b.date).getTime() - parseDateKey(a.date).getTime(),
+      )
       .slice(0, 5);
   }, [records, primaryCenter]);
 

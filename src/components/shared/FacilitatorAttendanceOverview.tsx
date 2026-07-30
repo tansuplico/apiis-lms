@@ -12,6 +12,7 @@ import {
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import StudentAttendanceModal from "./StudentAttendanceModal";
+import { parseDateKey } from "@/utils/dateformatter";
 
 interface FacilitatorAttendanceOverviewProps {
   facilitatorId: number;
@@ -67,27 +68,12 @@ const toDateKey = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
-// Inverse of toDateKey. NEVER use `new Date(dateKey)` directly on a
-// "yyyy-MM-dd" string — the built-in parser treats that as UTC midnight,
-// which shifts the displayed local date by a day in negative-UTC-offset
-// timezones (the exact bug this app already had on the write side once).
-const parseDateKey = (dateKey: string): Date => {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  return new Date(y, m - 1, d);
-};
-
 const startOfDay = (d: Date) => {
   const copy = new Date(d);
   copy.setHours(0, 0, 0, 0);
   return copy;
 };
 
-// ── CSV export: builds the CSV text only. Saving to disk uses the same
-// pattern as fileService.ts's course-content file download — the browser's
-// native File System Access API (showSaveFilePicker), which WebView2
-// (Chromium-based, used by Tauri on Windows) supports directly with no
-// Tauri plugin involved. Falls back to a blob + <a download> for
-// engines that don't support it, same as fileService.ts.
 const buildCsvContent = (rows: FacilitatorSheetRow[]) => {
   const escape = (value: string) =>
     value.includes(",") || value.includes('"')

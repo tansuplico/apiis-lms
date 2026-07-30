@@ -1,12 +1,9 @@
 // src/services/submissionService.ts
-import { tokenStorage } from "@/services/tokenStorage";
+import { authHeaders } from "@/services/authHeadersService";
+import { ApiError } from "@/services/apiClient";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
-
-async function authHeaders() {
-  const token = await tokenStorage.getToken();
-  return { Authorization: `Bearer ${token}` };
-}
 
 export interface SubmissionSettings {
   isActive: boolean;
@@ -44,8 +41,13 @@ export const submissionService = {
       { headers },
     );
     const data = await res.json();
-    if (!data.success)
-      throw new Error(data.message ?? "Failed to fetch settings.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(
+        res.status,
+        data.message ?? "Failed to fetch settings.",
+      );
+    }
     return data.data;
   },
 
@@ -64,8 +66,13 @@ export const submissionService = {
       },
     );
     const data = await res.json();
-    if (!data.success)
-      throw new Error(data.message ?? "Failed to update settings.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(
+        res.status,
+        data.message ?? "Failed to update settings.",
+      );
+    }
     return data.data;
   },
 
@@ -76,8 +83,13 @@ export const submissionService = {
       headers,
     });
     const data = await res.json();
-    if (!data.success)
-      throw new Error(data.message ?? "Failed to fetch submissions.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(
+        res.status,
+        data.message ?? "Failed to fetch submissions.",
+      );
+    }
     return data.data ?? [];
   },
 
@@ -89,8 +101,13 @@ export const submissionService = {
       { headers },
     );
     const data = await res.json();
-    if (!data.success)
-      throw new Error(data.message ?? "Failed to fetch submissions.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(
+        res.status,
+        data.message ?? "Failed to fetch submissions.",
+      );
+    }
     return data.data;
   },
 
@@ -106,7 +123,10 @@ export const submissionService = {
       body: formData,
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.message ?? "Upload failed.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, data.message ?? "Upload failed.");
+    }
     return data.data;
   },
 
@@ -118,7 +138,10 @@ export const submissionService = {
       headers,
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.message ?? "Delete failed.");
+    if (!data.success) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, data.message ?? "Delete failed.");
+    }
   },
 
   // ── Download (all roles — ownership enforced server-side)
@@ -133,7 +156,10 @@ export const submissionService = {
       `${base}/api/submissions/${submissionId}/download`,
       { headers },
     );
-    if (!res.ok) throw new Error("Download failed.");
+    if (!res.ok) {
+      await handleUnauthorizedResponse(res.status);
+      throw new ApiError(res.status, "Download failed.");
+    }
 
     const blob = await res.blob();
 
