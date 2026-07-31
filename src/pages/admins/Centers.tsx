@@ -72,25 +72,10 @@ export default function Centers() {
   return (
     <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <h3 className="text-4xl text-gray-900 dark:text-white">Centers</h3>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          disabled={!online}
-          title={!online ? "You're offline" : "Add Facilitator"}
-          className={`flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 ${
-            online
-              ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white cursor-pointer"
-              : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          <Plus size={20} />
-          New Center
-        </button>
-      </div>
+      <h3 className="text-4xl text-gray-900 dark:text-white">Centers</h3>
 
       {/* Search + view toggle */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 my-8">
         <div className="w-full sm:w-80 lg:w-96 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
           <Search
             size={20}
@@ -106,28 +91,43 @@ export default function Centers() {
           />
         </div>
 
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+        <div className="flex gap-5">
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2 rounded ${
+                viewMode === "list"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}
+              aria-label="List view"
+            >
+              <List size={24} strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded ${
+                viewMode === "grid"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={24} strokeWidth={1.5} />
+            </button>
+          </div>
           <button
-            onClick={() => setViewMode("list")}
-            className={`p-2.5 rounded ${
-              viewMode === "list"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+            onClick={() => setShowCreateModal(true)}
+            disabled={!online}
+            title={!online ? "You're offline" : "Add Facilitator"}
+            className={`flex items-center gap-2 px-6 py-2 font-medium rounded-lg shadow-md text-md transition-all shrink-0 ${
+              online
+                ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white cursor-pointer"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             }`}
-            aria-label="List view"
           >
-            <List size={24} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`p-2.5 rounded ${
-              viewMode === "grid"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-            }`}
-            aria-label="Grid view"
-          >
-            <LayoutGrid size={24} strokeWidth={1.5} />
+            <Plus size={20} />
+            New Center
           </button>
         </div>
       </div>

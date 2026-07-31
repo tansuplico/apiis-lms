@@ -312,7 +312,7 @@ export default function ViewCenter() {
               <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors">
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`p-2.5 rounded transition-colors ${
+                  className={`p-2 rounded transition-colors ${
                     viewMode === "list"
                       ? "bg-blue-600 text-white shadow-sm"
                       : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
@@ -323,7 +323,7 @@ export default function ViewCenter() {
                 </button>
                 <button
                   onClick={() => setViewMode("grid")}
-                  className={`p-2.5 rounded transition-colors ${
+                  className={`p-2 rounded transition-colors ${
                     viewMode === "grid"
                       ? "bg-blue-600 text-white shadow-sm"
                       : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"

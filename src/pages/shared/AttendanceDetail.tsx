@@ -1,6 +1,6 @@
 // src/pages/shared/AttendanceDetail.tsx
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCenterStore } from "@/stores/useCenterStore";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import { useEffect, useMemo, useState } from "react";
@@ -104,12 +104,6 @@ export default function AttendanceDetail() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <ArrowLeft size={22} />
-          </button>
           <div>
             <h1 className="text-3xl text-gray-900 dark:text-white">
               {parseDateKey(session.date).toLocaleDateString("en-US", {
@@ -144,19 +138,17 @@ export default function AttendanceDetail() {
       <div className="grid grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400">Present</p>
-          <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+          <p className="text-3xl  text-green-600 dark:text-green-400">
             {present}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400">Absent</p>
-          <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-            {absent}
-          </p>
+          <p className="text-3xl  text-red-600 dark:text-red-400">{absent}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
-          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+          <p className="text-3xl  text-blue-600 dark:text-blue-400">
             {session.records.length}
           </p>
         </div>

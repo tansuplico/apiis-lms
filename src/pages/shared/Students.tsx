@@ -12,6 +12,8 @@ import {
   ArrowUpDown,
   History,
   X,
+  Filter,
+  Building2,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { AccountStatus, Student } from "@/types/types";
@@ -28,6 +30,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import StudentTableSkeleton from "@/components/ui/StudentSkeleton";
 import StudentAvatar from "@/components/shared/StudentAvatar";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -309,11 +312,11 @@ export default function Students() {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
-      <h3 className="text-4xl text-gray-900 dark:text-white"> All Students </h3>
+      <h3 className="text-4xl text-gray-900 dark:text-white"> Students </h3>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex gap-5">
-            <div className="w-full sm:w-80 flex items-center  gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+            <div className="w-full sm:w-80 flex items-center  gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg">
               <Search size={20} className="text-gray-500 dark:text-gray-400" />
               <input
                 type="text"
@@ -324,32 +327,51 @@ export default function Students() {
               />
             </div>
 
-            <select
+            <FilterDropdown
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as AccountStatus | "all")
+              onChange={(v) => setStatusFilter(v as AccountStatus | "all")}
+              options={[
+                { value: "all", label: "All Statuses" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+                { value: "banned", label: "Banned" },
+              ]}
+              icon={
+                <Filter
+                  size={14}
+                  className={
+                    statusFilter !== "all"
+                      ? "text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }
+                />
               }
-              className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="banned">Banned</option>
-            </select>
+              active={statusFilter !== "all"}
+            />
 
-            <select
+            <FilterDropdown
               value={centerFilter}
-              onChange={(e) => setCenterFilter(e.target.value)}
-              className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-            >
-              <option value="all">All centers</option>
-              <option value="unassigned">Not assigned</option>
-              {centers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
+              onChange={setCenterFilter}
+              options={[
+                { value: "all", label: "All Centers" },
+                { value: "unassigned", label: "Not Assigned" },
+                ...centers.map((c) => ({
+                  value: String(c.id),
+                  label: c.title,
+                })),
+              ]}
+              icon={
+                <Building2
+                  size={14}
+                  className={
+                    centerFilter !== "all"
+                      ? "text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }
+                />
+              }
+              active={centerFilter !== "all"}
+            />
           </div>
 
           <div className="flex gap-5">
@@ -357,7 +379,7 @@ export default function Students() {
               onClick={() => setShowCreateModal(true)}
               disabled={!online}
               title={
-                !online ? "You're offline — connect to make changes" : undefined
+                !online ? "You're offline, connect to make changes" : undefined
               }
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all whitespace-nowrap shrink-0 ${
                 online

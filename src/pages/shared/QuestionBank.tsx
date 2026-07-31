@@ -440,73 +440,67 @@ export default function QuestionBank() {
 
   if (!activeCollection) {
     return (
-      <div className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 pb-10">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h3 className="text-4xl text-gray-900 dark:text-white">
-              Question Bank
-            </h3>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
-              <button
-                onClick={() => changeViewMode("list")}
-                className={`p-2.5 rounded ${
-                  viewMode === "list"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                }`}
-                aria-label="List view"
-              >
-                <ListIcon size={24} strokeWidth={1.5} />
-              </button>
-              <button
-                onClick={() => changeViewMode("grid")}
-                className={`p-2.5 rounded ${
-                  viewMode === "grid"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                }`}
-                aria-label="Grid view"
-              >
-                <LayoutGrid size={24} strokeWidth={1.5} />
-              </button>
-            </div>
-            <button
-              onClick={startCreateCollection}
-              className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
-            >
-              <Plus size={20} />
-              New Collection
-            </button>
-          </div>
-        </div>
+      <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+        <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
+          Question Bank
+        </h1>
+        <div className="w-full lg:w-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg">
+            <Search size={20} className="text-gray-500 dark:text-gray-400" />
 
-        {collections.length > 0 && (
-          <div className="relative mb-6 max-w-md">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
             <input
               type="text"
               value={collectionSearchQuery}
               onChange={(e) => setCollectionSearchQuery(e.target.value)}
               placeholder="Search collections..."
-              className="w-full pl-9 pr-9 py-2.5 border outline-none rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
+              className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
             />
+
             {collectionSearchQuery && (
-              <button
-                onClick={() => setCollectionSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                aria-label="Clear search"
-              >
-                <X size={16} />
+              <button onClick={() => setCollectionSearchQuery("")}>
+                <X
+                  size={16}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                />
               </button>
             )}
           </div>
-        )}
-
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+                <button
+                  onClick={() => changeViewMode("list")}
+                  className={`p-2 rounded ${
+                    viewMode === "list"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  }`}
+                  aria-label="List view"
+                >
+                  <ListIcon size={24} strokeWidth={1.5} />
+                </button>
+                <button
+                  onClick={() => changeViewMode("grid")}
+                  className={`p-2 rounded ${
+                    viewMode === "grid"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  }`}
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid size={24} strokeWidth={1.5} />
+                </button>
+              </div>
+              <button
+                onClick={startCreateCollection}
+                className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+              >
+                <Plus size={20} />
+                New Collection
+              </button>
+            </div>
+          </div>
+        </div>
         {collectionsLoading && collections.length === 0 ? (
           viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -635,7 +629,6 @@ export default function QuestionBank() {
             ))}
           </div>
         )}
-
         {collectionModalMode !== null && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -702,7 +695,6 @@ export default function QuestionBank() {
             </div>
           </div>
         )}
-
         {pendingDeleteCollection && (
           <DeleteConfirmModal
             title="Delete Collection"

@@ -8,21 +8,22 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
+  Building2,
 } from "lucide-react";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import StudentAttendanceModal from "./StudentAttendanceModal";
+import FilterDropdown from "./FilterDropdown";
 
 interface FacilitatorAttendanceOverviewProps {
   facilitatorId: number;
   facilitatorName?: string;
-  // Used to bound the facilitator sheet so we don't mark "Absent" on days
-  // before the facilitator's account even existed.
   facilitatorCreatedAt?: string;
 }
 
 type Tab = "students" | "sheet";
-type SortKey = "name" | "absent";
+type SortKey = "name" | "absent" | "present" | "rate";
 
 interface FacilitatorStudentSummary {
   studentId: number;
@@ -132,14 +133,9 @@ export default function FacilitatorAttendanceOverview({
     id: number;
     name: string;
   } | null>(null);
+  const [selectedCenter, setSelectedCenter] = useState("");
+  const [filterByMonth, setFilterByMonth] = useState(false);
 
-  // ── Effects: load this facilitator's full history (no center-scoped
-  // summary endpoint exists for facilitators, so everything below is
-  // computed client-side from the raw records instead).
-  // `loadedFacilitatorId` tracks which facilitator's data has actually
-  // finished loading fresh, so switching facilitators doesn't briefly
-  // flash stale cached records left over from a previous selection
-  // before the real fetch resolves.
   const [loadedFacilitatorId, setLoadedFacilitatorId] = useState<number | null>(
     null,
   );
@@ -157,6 +153,20 @@ export default function FacilitatorAttendanceOverview({
     () => records.filter((r) => r.facilitatorId === facilitatorId),
     [records, facilitatorId],
   );
+
+  const availableCenters = useMemo(() => {
+    const set = new Set<string>();
+    facilitatorRecords.forEach((r) => {
+      if (r.centerTitle) set.add(r.centerTitle);
+    });
+    return Array.from(set).sort();
+  }, [facilitatorRecords]);
+
+  useEffect(() => {
+    if (selectedCenter && !availableCenters.includes(selectedCenter)) {
+      setSelectedCenter("");
+    }
+  }, [availableCenters, selectedCenter]);
 
   // ── Derived: all of this facilitator's records indexed by date, for O(1)
   // per-day lookups. Shared by the month sheet table and the year heatmap
@@ -190,13 +200,31 @@ export default function FacilitatorAttendanceOverview({
     return grouped;
   }, [facilitatorRecords]);
 
+  const filteredRecordsForSummary = useMemo(() => {
+    let recs = facilitatorRecords;
+    if (filterByMonth) {
+      const y = month.getFullYear();
+      const m = month.getMonth();
+      recs = recs.filter((r) => {
+        const dateKey = (r.date ?? "").split("T")[0];
+        if (!dateKey) return false;
+        const d = parseDateKey(dateKey);
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+    }
+    if (selectedCenter) {
+      recs = recs.filter((r) => r.centerTitle === selectedCenter);
+    }
+    return recs;
+  }, [facilitatorRecords, filterByMonth, month, selectedCenter]);
+
   // ── Derived: client-computed per-student summary (mirrors the shape of
   // the backend's center-summary endpoint, since no facilitator-scoped
   // equivalent exists)
   const summary = useMemo(() => {
     const grouped = new Map<number, FacilitatorStudentSummary>();
 
-    facilitatorRecords.forEach((r) => {
+    filteredRecordsForSummary.forEach((r) => {
       let entry = grouped.get(r.studentId);
       if (!entry) {
         entry = {
@@ -227,7 +255,7 @@ export default function FacilitatorAttendanceOverview({
           ? Math.round((entry.presentDays / entry.totalDays) * 100)
           : 0,
     }));
-  }, [facilitatorRecords]);
+  }, [filteredRecordsForSummary]);
 
   // ── Derived: filtered + sorted summary
   const filteredSummary = useMemo(() => {
@@ -242,8 +270,16 @@ export default function FacilitatorAttendanceOverview({
       );
     }
     return [...result].sort((a, b) => {
-      if (sortKey === "absent") return b.absentDays - a.absentDays;
-      return a.lastName.localeCompare(b.lastName);
+      switch (sortKey) {
+        case "absent":
+          return b.absentDays - a.absentDays;
+        case "present":
+          return b.presentDays - a.presentDays;
+        case "rate":
+          return b.attendanceRate - a.attendanceRate;
+        default:
+          return a.lastName.localeCompare(b.lastName);
+      }
     });
   }, [summary, searchTerm, sortKey]);
 
@@ -495,8 +531,8 @@ export default function FacilitatorAttendanceOverview({
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
           {/* Per-student summary */}
           <div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
                 <div className="flex-1 sm:w-64 flex items-center gap-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-2.5 rounded-lg">
                   <Search
                     size={16}
@@ -510,15 +546,61 @@ export default function FacilitatorAttendanceOverview({
                     className="w-full bg-transparent focus:outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                   />
                 </div>
-                <button
-                  onClick={() =>
-                    setSortKey((k) => (k === "absent" ? "name" : "absent"))
+
+                <FilterDropdown
+                  value={sortKey}
+                  onChange={(v) => setSortKey(v as SortKey)}
+                  options={[
+                    { value: "absent", label: "Most absences" },
+                    { value: "present", label: "Most present" },
+                    { value: "rate", label: "Highest rate" },
+                    { value: "name", label: "Name (A–Z)" },
+                  ]}
+                  icon={
+                    <ArrowUpDown
+                      size={14}
+                      className="text-gray-500 dark:text-gray-400"
+                    />
                   }
-                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border bg-blue-600 hover:bg-blue-700 text-white text-sm whitespace-nowrap"
-                  title="Toggle sort order"
+                  active={false}
+                />
+
+                <FilterDropdown
+                  value={selectedCenter}
+                  onChange={setSelectedCenter}
+                  options={[
+                    { value: "", label: "All Centers" },
+                    ...availableCenters.map((c) => ({ value: c, label: c })),
+                  ]}
+                  icon={
+                    <Building2
+                      size={14}
+                      className={
+                        selectedCenter
+                          ? "text-white"
+                          : "text-gray-500 dark:text-gray-400"
+                      }
+                    />
+                  }
+                  active={!!selectedCenter}
+                />
+
+                <button
+                  onClick={() => setFilterByMonth((v) => !v)}
+                  title="Filter by month"
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm whitespace-nowrap transition-colors ${
+                    filterByMonth
+                      ? "bg-blue-600 hover:bg-blue-700 border-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
                 >
-                  <ArrowUpDown size={14} />
-                  {sortKey === "absent" ? "Most absences" : "Name"}
+                  <CalendarDays size={14} />
+                  {filterByMonth
+                    ? month.toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : "All time"}
                 </button>
               </div>
             </div>
@@ -566,7 +648,9 @@ export default function FacilitatorAttendanceOverview({
                         >
                           {searchTerm
                             ? `No students matching "${searchTerm}"`
-                            : `${facilitatorName ?? "This facilitator"} hasn't recorded any attendance yet.`}
+                            : selectedCenter || filterByMonth
+                              ? "No attendance records match the selected filters."
+                              : `${facilitatorName ?? "This facilitator"} hasn't recorded any attendance yet.`}
                         </td>
                       </tr>
                     ) : (
@@ -785,7 +869,6 @@ export default function FacilitatorAttendanceOverview({
               Export CSV
             </button>
           </div>
-          tsx
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             A facilitator is marked Present on a day if they submitted at least
             one student attendance record that day, across any center. The time

@@ -6,6 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   WifiOff,
+  Tag,
+  Filter,
+  Users,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import ViewTicketModal from "@/components/admins/tickets/ViewTicketModal";
@@ -14,6 +17,7 @@ import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import { isOnline, onNetworkChange } from "@/services/networkStatus";
 import { useTicketStore } from "@/stores/useTicketStore";
 import TicketTableSkeleton from "@/components/ui/TicketSkeleton";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -150,12 +154,12 @@ export default function AdminTickets() {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
+      <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
+        Tickets
+      </h1>
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
-          All Support Tickets
-        </h1>
         <div className="w-full lg:w-auto flex flex-wrap items-center gap-3">
-          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg">
             <Search size={20} className="text-gray-500 dark:text-gray-400" />
             <input
               type="text"
@@ -165,44 +169,68 @@ export default function AdminTickets() {
               className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
-
-          <select
+          <FilterDropdown
             value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as TicketStatus | "all")
+            onChange={(v) => setStatusFilter(v as TicketStatus | "all")}
+            options={[
+              { value: "all", label: "All Statuses" },
+              { value: "Open", label: "Open" },
+              { value: "In Progress", label: "In Progress" },
+              { value: "Resolved", label: "Resolved" },
+            ]}
+            icon={
+              <Filter
+                size={14}
+                className={
+                  statusFilter !== "all"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
             }
-            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-          >
-            <option value="all">All statuses</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
+            active={statusFilter !== "all"}
+          />
 
-          <select
+          <FilterDropdown
             value={roleFilter}
-            onChange={(e) =>
-              setRoleFilter(e.target.value as SenderRole | "all")
+            onChange={(v) => setRoleFilter(v as SenderRole | "all")}
+            options={[
+              { value: "all", label: "All Roles" },
+              { value: "student", label: "Student" },
+              { value: "facilitator", label: "Facilitator" },
+            ]}
+            icon={
+              <Users
+                size={14}
+                className={
+                  roleFilter !== "all"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
             }
-            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-          >
-            <option value="all">All roles</option>
-            <option value="student">Student</option>
-            <option value="facilitator">Facilitator</option>
-          </select>
+            active={roleFilter !== "all"}
+          />
 
-          <select
+          <FilterDropdown
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-          >
-            <option value="all">All categories</option>
-            {categoryOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryFilter}
+            options={[
+              { value: "all", label: "All Categories" },
+              ...categoryOptions.map((c) => ({ value: c, label: c })),
+            ]}
+            icon={
+              <Tag
+                size={14}
+                className={
+                  categoryFilter !== "all"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
+            }
+            active={categoryFilter !== "all"}
+          />
         </div>
       </div>
 

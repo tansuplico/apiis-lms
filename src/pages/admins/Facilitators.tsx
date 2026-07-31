@@ -172,13 +172,10 @@ export default function AdminFacilitators() {
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Header */}
+      <h3 className="text-4xl text-gray-900 dark:text-white">Facilitators</h3>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h3 className="text-4xl text-gray-900 dark:text-white">
-          All Facilitators
-        </h3>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex-1 sm:w-80 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+        <div className="w-full flex items-center justify-between gap-3 ">
+          <div className=" sm:w-80 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
             <Search size={20} className="text-gray-500 dark:text-gray-400" />
             <input
               type="text"
@@ -193,9 +190,9 @@ export default function AdminFacilitators() {
             onClick={() => setShowCreateModal(true)}
             disabled={!online}
             title={!online ? "You're offline" : "Add Facilitator"}
-            className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all shrink-0 ${
               online
-                ? "bg-[#0070FF] hover:bg-[#0063e4] text-white cursor-pointer"
+                ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
                 : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             }`}
           >

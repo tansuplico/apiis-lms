@@ -1,19 +1,15 @@
 // src/pages/students/Shop.tsx
-import { ChevronDown, Gem, Search, Loader2 } from "lucide-react";
+import { Gem, Search, Loader2, Tag } from "lucide-react";
 import shop from "../../assets/shop.png";
 import { useState, useEffect } from "react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
+
 import { Accessory, AccessoryCategory } from "@/types/types";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useShopStore } from "@/stores/useShopStore";
 import { toast } from "react-toastify";
 import { Navigate } from "react-router-dom";
 import { useDebounce } from "@/hooks/useDebounce";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 
 const CATEGORIES: AccessoryCategory[] = ["Cover Photo Color", "Profile Avatar"];
 type CategoryFilter = "Cover Photo Color" | "Profile Avatar" | "All";
@@ -116,56 +112,59 @@ export default function Shop() {
       </div>
 
       {/* Search + Category */}
-      <div className="flex flex-col sm:flex-row py-10 justify-between items-start sm:items-center gap-4">
-        <div className="flex-1 flex items-center gap-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3.5 rounded-xl focus-within:border-[#0070FF] dark:focus-within:border-blue-500">
-          <Search
-            size={20}
-            strokeWidth={1.8}
-            className="text-gray-500 dark:text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Search an accessory..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          />
-          {searchText && (
-            <button
-              onClick={() => setSearchText("")}
-              className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-            >
-              ×
-            </button>
-          )}
-        </div>
+      <div className="flex flex-col sm:flex-row py-10 justify-between items-start sm:items-center gap-3">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+            <Search
+              size={20}
+              strokeWidth={1.8}
+              className="text-gray-500 dark:text-gray-400"
+            />
 
-        <Listbox value={selectedCategory} onChange={setSelectedCategory}>
-          <div className="relative w-full sm:w-60">
-            <ListboxButton className="relative w-full flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-[#0070FF] dark:hover:bg-blue-700 hover:text-white px-5 py-3.5 rounded-xl font-medium border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0070FF]/50 dark:focus:ring-blue-500/50">
-              <span className="block truncate">{selectedCategory}</span>
-              <ChevronDown size={18} strokeWidth={2} className="opacity-70" />
-            </ListboxButton>
-            <ListboxOptions
-              modal={false}
-              className="absolute mt-2 w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-72 overflow-auto z-50 focus:outline-none"
-            >
-              {(["All", ...CATEGORIES] as const).map((cat) => (
-                <ListboxOption
-                  key={cat}
-                  value={cat}
-                  className={({ active, selected }) =>
-                    `relative cursor-pointer select-none py-3 px-5 text-gray-900 dark:text-gray-100 transition-colors ${
-                      active ? "bg-[#0070FF] dark:bg-blue-700 text-white" : ""
-                    } ${selected ? "font-medium" : ""}`
-                  }
-                >
-                  {cat}
-                </ListboxOption>
-              ))}
-            </ListboxOptions>
+            <input
+              type="text"
+              placeholder="Search an accessory..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                ×
+              </button>
+            )}
           </div>
-        </Listbox>
+
+          <FilterDropdown
+            value={selectedCategory}
+            onChange={(value) => setSelectedCategory(value as CategoryFilter)}
+            options={[
+              {
+                value: "All",
+                label: "All Categories",
+              },
+              ...CATEGORIES.map((category) => ({
+                value: category,
+                label: category,
+              })),
+            ]}
+            icon={
+              <Tag
+                size={14}
+                className={
+                  selectedCategory !== "All"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
+            }
+            active={selectedCategory !== "All"}
+          />
+        </div>
       </div>
 
       {/* Loading state */}

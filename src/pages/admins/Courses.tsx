@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Tag,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 
@@ -16,6 +17,7 @@ import CourseGridCardSkeleton from "@/components/ui/CourseGridCardSkeleton";
 import CreateCourseModal from "@/components/admins/courses/CreateCourseModal";
 import { useCourseStore } from "@/stores/useCourseStore";
 import { isOnline, onNetworkChange } from "@/services/networkStatus";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -23,6 +25,7 @@ export default function Courses() {
   // ── View, search & pagination state
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── Store
@@ -40,8 +43,23 @@ export default function Courses() {
   }, []);
 
   // ── Derived: filtered list
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    courses.forEach((c) => {
+      if (c.category) set.add(c.category);
+    });
+    return Array.from(set).sort();
+  }, [courses]);
+
+  // ── Derived: filtered list
   const processedCourses = useMemo(() => {
     let deconstructedCourses = [...courses];
+
+    if (selectedCategory) {
+      deconstructedCourses = deconstructedCourses.filter(
+        (c) => c.category === selectedCategory,
+      );
+    }
 
     if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase().trim();
@@ -53,7 +71,7 @@ export default function Courses() {
     }
 
     return deconstructedCourses;
-  }, [searchTerm, courses]);
+  }, [searchTerm, selectedCategory, courses]);
 
   // ── Derived: pagination
   const totalPages = Math.ceil(processedCourses.length / ITEMS_PER_PAGE);
@@ -69,7 +87,7 @@ export default function Courses() {
   // ── Effects: reset to first page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, selectedCategory]);
 
   // ── Handlers: pagination
   const goToPage = (page: number) => {
@@ -81,65 +99,86 @@ export default function Courses() {
   return (
     <div className="bg-white dark:bg-gray-950  text-gray-900 dark:text-gray-100 pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <h3 className="text-4xl text-gray-900 dark:text-white">Courses</h3>
-
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          disabled={!online}
-          title={!online ? "You're offline" : "Add Facilitator"}
-          className={`flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 ${
-            online
-              ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white cursor-pointer"
-              : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          <Plus size={20} />
-          New Course
-        </button>
-      </div>
+      <h3 className="text-4xl text-gray-900 dark:text-white">Courses</h3>
 
       {/* Controls: search + view toggle */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 flex-wrap">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 my-8 flex-wrap">
         {/* Search */}
-        <div className="w-full sm:w-96 lg:w-105 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg ">
-          <Search
-            size={20}
-            strokeWidth={1.5}
-            className="text-gray-500 dark:text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Search a course..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+        <div className="flex items-center gap-5">
+          <div className="w-full sm:w-96 lg:w-105 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg ">
+            <Search
+              size={20}
+              strokeWidth={1.5}
+              className="text-gray-500 dark:text-gray-400"
+            />
+            <input
+              type="text"
+              placeholder="Search a course..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+          </div>
+
+          <FilterDropdown
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+            options={[
+              { value: "", label: "All Categories" },
+              ...availableCategories.map((c) => ({ value: c, label: c })),
+            ]}
+            icon={
+              <Tag
+                size={14}
+                className={
+                  selectedCategory
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
+            }
+            active={!!selectedCategory}
           />
         </div>
 
         {/* View toggle */}
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 ">
+        <div className="flex gap-5">
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 ">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2 rounded  ${
+                viewMode === "list"
+                  ? "bg-[#0070FF] text-white shadow-sm"
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}
+              aria-label="List view"
+            >
+              <List size={24} strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded  ${
+                viewMode === "grid"
+                  ? "bg-[#0070FF] text-white shadow-sm"
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={24} strokeWidth={1.5} />
+            </button>
+          </div>
           <button
-            onClick={() => setViewMode("list")}
-            className={`p-2.5 rounded  ${
-              viewMode === "list"
-                ? "bg-[#0070FF] text-white shadow-sm"
-                : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+            onClick={() => setIsCreateModalOpen(true)}
+            disabled={!online}
+            title={!online ? "You're offline" : "Add Facilitator"}
+            className={`flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 ${
+              online
+                ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white cursor-pointer"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             }`}
-            aria-label="List view"
           >
-            <List size={24} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`p-2.5 rounded  ${
-              viewMode === "grid"
-                ? "bg-[#0070FF] text-white shadow-sm"
-                : "hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-            }`}
-            aria-label="Grid view"
-          >
-            <LayoutGrid size={24} strokeWidth={1.5} />
+            <Plus size={20} />
+            New Course
           </button>
         </div>
       </div>

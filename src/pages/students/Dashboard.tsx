@@ -171,7 +171,7 @@ export default function Dashboard() {
                 Courses Completed
               </p>
               <p
-                className="text-2xl font-extrabold"
+                className="text-3xl text-gray-900 dark:text-white mt-1"
                 style={{ color: "var(--student-ink)" }}
               >
                 {completedCoursesCount}
@@ -196,7 +196,7 @@ export default function Dashboard() {
                 My Center
               </p>
               <p
-                className="text-2xl font-extrabold truncate"
+                className="text-3xl text-gray-900 dark:text-white mt-1"
                 style={{ color: "var(--student-ink)" }}
               >
                 {currentCenter ? currentCenter.title : "Not assigned"}

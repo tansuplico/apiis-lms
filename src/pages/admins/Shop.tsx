@@ -1,5 +1,6 @@
 // src/pages/admin/Shop.tsx
-import { Coins, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Coins, Search, Plus, Pencil, Trash2, Tag } from "lucide-react";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 import shop from "../../assets/shop.png";
 import { useState, useEffect } from "react";
 import { Accessory, AccessoryCategory } from "@/types/types";
@@ -170,7 +171,7 @@ export default function AdminShop() {
       <div className="flex flex-col sm:flex-row py-10 justify-between items-start sm:items-center gap-3">
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Search */}
-          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-3 rounded-lg">
+          <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg">
             <Search size={20} className="text-gray-500 dark:text-gray-400" />
             <input
               type="text"
@@ -190,20 +191,33 @@ export default function AdminShop() {
           </div>
 
           {/* Category Dropdown */}
-          <select
+          <FilterDropdown
             value={selectedCategory}
-            onChange={(e) =>
-              setSelectedCategory(e.target.value as AccessoryCategory | "All")
+            onChange={(value) =>
+              setSelectedCategory(value as AccessoryCategory | "All")
             }
-            className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-4 py-3 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-          >
-            <option value="All">All categories</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+            options={[
+              {
+                value: "All",
+                label: "All Categories",
+              },
+              ...CATEGORIES.map((category) => ({
+                value: category,
+                label: category,
+              })),
+            ]}
+            icon={
+              <Tag
+                size={14}
+                className={
+                  selectedCategory !== "All"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
+            }
+            active={selectedCategory !== "All"}
+          />
         </div>
 
         {/* Add Item Button */}
