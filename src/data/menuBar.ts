@@ -37,5 +37,3 @@ export function menuBarStateSelector(ctx: EditorStateSnapshot<Editor | null>) {
     canRedo: editor.can().chain().redo().run() ?? false,
   };
 }
-
-export type MenuBarState = ReturnType<typeof menuBarStateSelector>;

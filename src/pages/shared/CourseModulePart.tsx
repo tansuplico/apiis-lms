@@ -20,7 +20,8 @@ import CourseActivity from "../admins/CourseActivity";
 import TipTapEditor from "@/components/admins/courses/TipTapEditor";
 import { Course, QuizQuestion } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
-import { tokenStorage } from "@/services/tokenStorage";
+import { authHeaders } from "@/services/authHeadersService";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 
 export default function CourseModulePart() {
   // ── Routing
@@ -178,16 +179,19 @@ export default function CourseModulePart() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
-    const token = await tokenStorage.getToken();
+    const headers = await authHeaders();
     const formData = new FormData();
     formData.append("image", file);
 
     fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
       body: formData,
-    }).catch(() => {});
-
+    })
+      .then((res) => {
+        if (res.status === 401) handleUnauthorizedResponse(res.status);
+      })
+      .catch(() => {});
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

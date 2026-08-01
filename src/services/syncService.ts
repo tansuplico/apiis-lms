@@ -2,25 +2,6 @@ import { toBase64 } from "@/utils/imageUtils";
 import { getLocalDb } from "./localDb";
 import { Course } from "@/types/types";
 
-type VideoDownloadProgress = {
-  total: number;
-  completed: number;
-  failed: number;
-  currentTitle: string | null;
-};
-
-const progressListeners: Array<(p: VideoDownloadProgress) => void> = [];
-
-export function onVideoDownloadProgress(
-  cb: (p: VideoDownloadProgress) => void,
-): () => void {
-  progressListeners.push(cb);
-  return () => {
-    const idx = progressListeners.indexOf(cb);
-    if (idx !== -1) progressListeners.splice(idx, 1);
-  };
-}
-
 export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
   const db = await getLocalDb();
 

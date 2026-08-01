@@ -83,16 +83,3 @@ export function startNetworkPolling(
     await checkOnline();
   }, POLL_INTERVAL_MS);
 }
-
-export function resetNetworkState() {
-  _cachedOnline = true;
-  _pollingStarted = false;
-  _failCount = 0;
-}
-
-export function markOffline(): void {
-  _failCount++;
-  if (_failCount >= FAIL_THRESHOLD) {
-    _applyStatus(false);
-  }
-}

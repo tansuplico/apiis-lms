@@ -1,4 +1,4 @@
-// src/pages/admins/QuestionBank.tsx
+// src/pages/shared/QuestionBank.tsx
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -24,7 +24,8 @@ import {
 } from "@/types/types";
 import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
-import { tokenStorage } from "@/services/tokenStorage";
+import { authHeaders } from "@/services/authHeadersService";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkeleton";
 import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
@@ -373,15 +374,18 @@ export default function QuestionBank() {
       return;
     }
 
-    const token = await tokenStorage.getToken();
+    const headers = await authHeaders();
     const formData = new FormData();
     formData.append("image", file);
     fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
       body: formData,
-    }).catch(() => {});
-
+    })
+      .then((res) => {
+        if (res.status === 401) handleUnauthorizedResponse(res.status);
+      })
+      .catch(() => {});
     const reader = new FileReader();
     reader.onload = () => {
       setDraft((prev) => ({ ...prev, imageUrl: reader.result as string }));

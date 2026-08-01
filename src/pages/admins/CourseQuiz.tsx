@@ -28,8 +28,8 @@ import {
   QuizQuestion,
   QuizQuestionType,
 } from "@/types/types";
-import { tokenStorage } from "@/services/tokenStorage";
-
+import { authHeaders } from "@/services/authHeadersService";
+import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
 
@@ -448,15 +448,18 @@ export default function CourseQuiz({
     // Fire-and-forget copy to the server (same pattern as course content
     // images) — the base64 embed below is what's actually stored/rendered,
     // so a failure here doesn't block the question image from working.
-    const token = await tokenStorage.getToken();
+    const headers = await authHeaders();
     const formData = new FormData();
     formData.append("image", file);
     fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
       body: formData,
-    }).catch(() => {});
-
+    })
+      .then((res) => {
+        if (res.status === 401) handleUnauthorizedResponse(res.status);
+      })
+      .catch(() => {});
     const reader = new FileReader();
     reader.onload = () => {
       setQuestionDraft((prev) => ({

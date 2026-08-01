@@ -202,15 +202,6 @@ export type AttendanceRecord = {
   submittedAt?: string;
 };
 
-export type AttendanceSession = {
-  id: number;
-  centerId: number;
-  centerName: string;
-  date: string;
-  records: AttendanceRecord[];
-  savedBy: number;
-};
-
 // ─── Tickets ──────────────────────────────────────────────────
 export type TicketStatus = "Open" | "In Progress" | "Resolved";
 export type SenderRole = "student" | "facilitator";
@@ -227,23 +218,6 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
 }
-
-export type GetAllTicketsParams = {
-  page?: number;
-  limit?: number;
-  status?: TicketStatus;
-  role?: SenderRole;
-};
-
-export type TicketsApiResponse = {
-  data: Ticket[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-};
 
 // ─── Gradebook ────────────────────────────────────────────────
 export interface GradebookState {
