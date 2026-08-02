@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { X } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
-export interface ModuleWeight {
+interface ModuleWeight {
   id: number;
   number: number;
   title: string;

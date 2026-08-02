@@ -30,6 +30,16 @@ class ApiError extends Error {
   }
 }
 
+function toFriendlyError(err: unknown): never {
+  if (err instanceof ApiError) {
+    throw err;
+  }
+  throw new ApiError(
+    0,
+    "Connection seems slow or unavailable. Please check your internet and try again.",
+  );
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {},
@@ -72,7 +82,7 @@ async function request<T>(
 
     return data;
   } catch (err) {
-    throw err;
+    toFriendlyError(err);
   }
 }
 
@@ -93,4 +103,4 @@ export const apiClient = {
     request<T>(endpoint, { method: "DELETE", requiresAuth }),
 };
 
-export { ApiError };
+export { ApiError, toFriendlyError };

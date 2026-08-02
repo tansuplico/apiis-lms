@@ -19,12 +19,12 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import { useSubmissionStore } from "@/stores/useSubmissionStore";
 import { toast } from "react-toastify";
 import WeightModal from "@/components/admins/courses/WeightModal";
-import DeleteConfirmationModal from "@/components/admins/courses/DeleteConfirmationModal";
 import VideoPreviewModal from "@/components/admins/courses/VideoPreviewModal";
 import AddPartModal from "@/components/admins/courses/AddPartModal";
 import { fileService } from "@/services/fileService";
 import { submissionService } from "@/services/submissionService";
 import { isOnline } from "@/services/networkStatus";
+import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 
 const PREDEFINED_PARTS = [
   { slug: "lessons", name: "Lessons", color: "#8A2BE2" },
@@ -68,6 +68,7 @@ export default function FacilitatorCourseLayout() {
 
   // ── State: delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "module" | "part";
     moduleId?: number;
@@ -189,6 +190,7 @@ export default function FacilitatorCourseLayout() {
   // ── Handlers: delete
   const handleDeleteConfirm = async () => {
     if (!deleteTarget || !course) return;
+    setIsDeleting(true);
     try {
       if (
         deleteTarget.type === "module" &&
@@ -222,6 +224,7 @@ export default function FacilitatorCourseLayout() {
       }
     } catch {
     } finally {
+      setIsDeleting(false);
       setShowDeleteModal(false);
       setDeleteTarget(null);
     }
@@ -1017,22 +1020,25 @@ export default function FacilitatorCourseLayout() {
       />
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
-        isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setDeleteTarget(null);
-        }}
-        onConfirm={handleDeleteConfirm}
-        title={
-          deleteTarget?.type === "module" ? "Delete Module?" : "Delete Part?"
-        }
-        message={
-          deleteTarget?.type === "module"
-            ? "This will permanently delete the module and all its parts. This action cannot be undone."
-            : "This will permanently delete the selected part. This action cannot be undone."
-        }
-      />
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget?.type === "module" ? "Delete Module?" : "Delete Part?"
+          }
+          message={
+            deleteTarget?.type === "module"
+              ? "This will permanently delete the module and all its parts. This action cannot be undone."
+              : "This will permanently delete the selected part. This action cannot be undone."
+          }
+          itemName=""
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setShowDeleteModal(false);
+            setDeleteTarget(null);
+          }}
+          isDeleting={isDeleting}
+        />
+      )}
 
       {/* Add Part Modal */}
       {showAddPartModal && addPartModuleIndex !== null && (

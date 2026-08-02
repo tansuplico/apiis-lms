@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { toBase64 } from "@/utils/imageUtils";
 import { useFacilitatorListStore } from "./useFacilitatorListStore";
 
-export type AddStudentResult =
+type AddStudentResult =
   | "success"
   | "already_in_center"
   | "in_other_center"

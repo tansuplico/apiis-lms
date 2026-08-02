@@ -71,7 +71,7 @@ export type QuizQuestionType =
   | "true_false"
   | "matching";
 
-export type MatchingPair = {
+type MatchingPair = {
   left: string;
   right: string;
 };
@@ -256,7 +256,7 @@ export type QuizBankCollection = {
 };
 
 // ─── Center Gradebook (class-wide, one row per student) ────────
-export interface CenterGradebookModuleResult {
+interface CenterGradebookModuleResult {
   moduleNumber: number;
   moduleTitle: string;
   moduleWeight: number | null;
@@ -271,13 +271,13 @@ export interface CenterGradebookModuleResult {
   effectiveWeight?: number;
 }
 
-export interface CenterGradebookModule {
+interface CenterGradebookModule {
   moduleNumber: number;
   moduleTitle: string;
   moduleWeight: number | null;
 }
 
-export interface CenterGradebookStudent {
+interface CenterGradebookStudent {
   studentId: number;
   idNumber: string;
   firstName: string;

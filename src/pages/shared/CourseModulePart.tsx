@@ -13,15 +13,13 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
-import CourseIntroduction from "../admins/CourseIntroduction";
-import CourseSummary from "../admins/CourseSummary";
 import CourseQuiz from "../admins/CourseQuiz";
-import CourseActivity from "../admins/CourseActivity";
 import TipTapEditor from "@/components/admins/courses/TipTapEditor";
 import { Course, QuizQuestion } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
 import { authHeaders } from "@/services/authHeadersService";
 import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
+import CoursePartViewer from "../admins/CoursePartViewer";
 
 export default function CourseModulePart() {
   // ── Routing
@@ -257,7 +255,6 @@ export default function CourseModulePart() {
             </div>
           )}
         </div>
-
         {/* Content area */}
         <div className="p-7 prose prose-lg max-w-4xl mx-auto text-gray-800 dark:text-gray-300 prose-headings:text-gray-900 dark:prose-headings:text-white prose-a:text-blue-600 dark:prose-a:text-blue-400">
           {isEditMode ? (
@@ -281,26 +278,29 @@ export default function CourseModulePart() {
             </div>
           ) : (
             <>
-              {partSlug === "introduction" && (
-                <CourseIntroduction part={currentPart} />
-              )}
-              {partSlug === "lessons" && <CourseSummary part={currentPart} />}
-              {partSlug === "quiz" && (
+              {partSlug === "quiz" ? (
                 <CourseQuiz
                   quizQuestions={editedQuestions}
                   setQuizQuestions={setEditedQuestions}
                   isEditMode={false}
                 />
+              ) : (
+                <CoursePartViewer
+                  part={currentPart}
+                  fallbackText={
+                    {
+                      introduction:
+                        "Welcome! This is the introduction section...",
+                      lessons: "Welcome! This is the Summary section...",
+                      activities: "Welcome! This is the activity section...",
+                    }[partSlug || ""] ||
+                    "Welcome! This is the introduction section..."
+                  }
+                />
               )}
-              {partSlug === "activities" && (
-                <CourseActivity part={currentPart} />
-              )}
-              {!["introduction", "lessons", "quiz", "activities"].includes(
-                partSlug || "",
-              ) && <CourseIntroduction part={currentPart} />}
             </>
           )}
-        </div>
+        </div>{" "}
       </div>
 
       {/* Delete modal */}

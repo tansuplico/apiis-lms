@@ -2,7 +2,7 @@
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { X } from "lucide-react";
 
-export interface PartOption {
+interface PartOption {
   slug: "lessons" | "activities";
   name: string;
   color: string;

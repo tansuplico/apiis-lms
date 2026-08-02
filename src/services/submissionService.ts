@@ -1,6 +1,6 @@
 // src/services/submissionService.ts
 import { authHeaders } from "@/services/authHeadersService";
-import { ApiError } from "@/services/apiClient";
+import { ApiError, toFriendlyError } from "@/services/apiClient";
 import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
@@ -20,7 +20,7 @@ export interface ModuleSubmission {
   submittedAt: string;
 }
 
-export interface StudentSubmission {
+interface StudentSubmission {
   id: number;
   originalFilename: string;
   mimeType: string;
@@ -36,19 +36,23 @@ export const submissionService = {
   // ── Settings (admin/facilitator)
   getSettings: async (moduleId: number): Promise<SubmissionSettings> => {
     const headers = await authHeaders();
-    const res = await fetch(
-      `${BASE_URL}/submissions/modules/${moduleId}/settings`,
-      { headers },
-    );
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(
-        res.status,
-        data.message ?? "Failed to fetch settings.",
+    try {
+      const res = await fetch(
+        `${BASE_URL}/submissions/modules/${moduleId}/settings`,
+        { headers },
       );
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(
+          res.status,
+          data.message ?? "Failed to fetch settings.",
+        );
+      }
+      return data.data;
+    } catch (err) {
+      toFriendlyError(err);
     }
-    return data.data;
   },
 
   updateSettings: async (
@@ -57,58 +61,70 @@ export const submissionService = {
     maxFiles: number,
   ): Promise<SubmissionSettings> => {
     const headers = await authHeaders();
-    const res = await fetch(
-      `${BASE_URL}/submissions/modules/${moduleId}/settings`,
-      {
-        method: "PUT",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive, maxFiles }),
-      },
-    );
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(
-        res.status,
-        data.message ?? "Failed to update settings.",
+    try {
+      const res = await fetch(
+        `${BASE_URL}/submissions/modules/${moduleId}/settings`,
+        {
+          method: "PUT",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive, maxFiles }),
+        },
       );
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(
+          res.status,
+          data.message ?? "Failed to update settings.",
+        );
+      }
+      return data.data;
+    } catch (err) {
+      toFriendlyError(err);
     }
-    return data.data;
   },
 
   // ── List (admin/facilitator)
   listSubmissions: async (moduleId: number): Promise<ModuleSubmission[]> => {
     const headers = await authHeaders();
-    const res = await fetch(`${BASE_URL}/submissions/modules/${moduleId}`, {
-      headers,
-    });
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(
-        res.status,
-        data.message ?? "Failed to fetch submissions.",
-      );
+    try {
+      const res = await fetch(`${BASE_URL}/submissions/modules/${moduleId}`, {
+        headers,
+      });
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(
+          res.status,
+          data.message ?? "Failed to fetch submissions.",
+        );
+      }
+      return data.data ?? [];
+    } catch (err) {
+      toFriendlyError(err);
     }
-    return data.data ?? [];
   },
 
   // ── My submissions (student)
   getMySubmissions: async (moduleId: number): Promise<MySubmissionsData> => {
     const headers = await authHeaders();
-    const res = await fetch(
-      `${BASE_URL}/submissions/modules/${moduleId}/mine`,
-      { headers },
-    );
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(
-        res.status,
-        data.message ?? "Failed to fetch submissions.",
+    try {
+      const res = await fetch(
+        `${BASE_URL}/submissions/modules/${moduleId}/mine`,
+        { headers },
       );
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(
+          res.status,
+          data.message ?? "Failed to fetch submissions.",
+        );
+      }
+      return data.data;
+    } catch (err) {
+      toFriendlyError(err);
     }
-    return data.data;
   },
 
   // ── Upload (student)
@@ -117,30 +133,38 @@ export const submissionService = {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`${BASE_URL}/submissions/modules/${moduleId}`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, data.message ?? "Upload failed.");
+    try {
+      const res = await fetch(`${BASE_URL}/submissions/modules/${moduleId}`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, data.message ?? "Upload failed.");
+      }
+      return data.data;
+    } catch (err) {
+      toFriendlyError(err);
     }
-    return data.data;
   },
 
   // ── Delete (admin/facilitator)
   deleteSubmission: async (submissionId: number): Promise<void> => {
     const headers = await authHeaders();
-    const res = await fetch(`${BASE_URL}/submissions/${submissionId}`, {
-      method: "DELETE",
-      headers,
-    });
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, data.message ?? "Delete failed.");
+    try {
+      const res = await fetch(`${BASE_URL}/submissions/${submissionId}`, {
+        method: "DELETE",
+        headers,
+      });
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, data.message ?? "Delete failed.");
+      }
+    } catch (err) {
+      toFriendlyError(err);
     }
   },
 
@@ -152,16 +176,21 @@ export const submissionService = {
     const headers = await authHeaders();
     const base = (BASE_URL as string).replace(/\/api$/, "");
 
-    const res = await fetch(
-      `${base}/api/submissions/${submissionId}/download`,
-      { headers },
-    );
-    if (!res.ok) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, "Download failed.");
+    let blob: Blob;
+    try {
+      const res = await fetch(
+        `${base}/api/submissions/${submissionId}/download`,
+        { headers },
+      );
+      if (!res.ok) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, "Download failed.");
+      }
+      blob = await res.blob();
+    } catch (err) {
+      toFriendlyError(err);
+      return; // unreachable — toFriendlyError always throws — keeps TS happy
     }
-
-    const blob = await res.blob();
 
     if ("showSaveFilePicker" in window) {
       try {

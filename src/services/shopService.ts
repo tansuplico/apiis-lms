@@ -13,7 +13,7 @@ export interface ShopItemDTO {
   updatedAt: string;
 }
 
-export interface CreateShopItemPayload {
+interface CreateShopItemPayload {
   name: string;
   category: "Cover Photo Color" | "Profile Avatar";
   price: number;
@@ -22,7 +22,7 @@ export interface CreateShopItemPayload {
   targetRole?: string | null;
 }
 
-export interface UpdateShopItemPayload {
+interface UpdateShopItemPayload {
   name?: string;
   price?: number;
   color?: string;

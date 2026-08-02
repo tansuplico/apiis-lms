@@ -1,5 +1,5 @@
 import { authHeaders } from "@/services/authHeadersService";
-import { ApiError } from "@/services/apiClient";
+import { ApiError, toFriendlyError } from "@/services/apiClient";
 import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import { ModuleFile } from "@/types/types";
 
@@ -16,39 +16,48 @@ export const fileService = {
     formData.append("file", file);
     formData.append("title", title);
 
-    const res = await fetch(`${BASE_URL}/files/modules/${moduleId}/files`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
+    try {
+      const res = await fetch(`${BASE_URL}/files/modules/${moduleId}/files`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
 
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, data.message ?? "Upload failed.");
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, data.message ?? "Upload failed.");
+      }
+
+      return {
+        id: data.data.id,
+        moduleId: data.data.module_id,
+        title: data.data.title,
+        originalFilename: data.data.original_filename,
+        mimeType: data.data.mime_type,
+        sortOrder: data.data.sort_order,
+      };
+    } catch (err) {
+      toFriendlyError(err);
     }
-
-    return {
-      id: data.data.id,
-      moduleId: data.data.module_id,
-      title: data.data.title,
-      originalFilename: data.data.original_filename,
-      mimeType: data.data.mime_type,
-      sortOrder: data.data.sort_order,
-    };
   },
 
   delete: async (fileId: number): Promise<void> => {
     const headers = await authHeaders();
-    const res = await fetch(`${BASE_URL}/files/${fileId}`, {
-      method: "DELETE",
-      headers,
-    });
 
-    const data = await res.json();
-    if (!data.success) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, data.message ?? "Delete failed.");
+    try {
+      const res = await fetch(`${BASE_URL}/files/${fileId}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, data.message ?? "Delete failed.");
+      }
+    } catch (err) {
+      toFriendlyError(err);
     }
   },
 
@@ -56,15 +65,20 @@ export const fileService = {
     const headers = await authHeaders();
     const base = (BASE_URL as string).replace(/\/api$/, "");
 
-    const res = await fetch(`${base}/api/files/${fileId}/download`, {
-      headers,
-    });
-    if (!res.ok) {
-      await handleUnauthorizedResponse(res.status);
-      throw new ApiError(res.status, "Download failed.");
+    let blob: Blob;
+    try {
+      const res = await fetch(`${base}/api/files/${fileId}/download`, {
+        headers,
+      });
+      if (!res.ok) {
+        await handleUnauthorizedResponse(res.status);
+        throw new ApiError(res.status, "Download failed.");
+      }
+      blob = await res.blob();
+    } catch (err) {
+      toFriendlyError(err);
+      return;
     }
-
-    const blob = await res.blob();
 
     // ── Use OS save dialog if supported (Chrome/Edge)
     if ("showSaveFilePicker" in window) {

@@ -605,13 +605,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     if (!matchedRole || !matchedEmail) {
-      res.status(404).json({
-        success: false,
-        message: "This email is not registered.",
-      });
+      genericResponse();
       return;
     }
-
     const COOLDOWN_SECONDS = 60;
 
     const recentRequest = await pool.query(

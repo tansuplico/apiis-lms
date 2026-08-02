@@ -1,11 +1,9 @@
 // src/pages/students/CourseModulePart.tsx
 import { useParams, useOutletContext } from "react-router-dom";
 import { BookOpen, FileText, PlayCircle, CheckCircle } from "lucide-react";
-import CourseIntroduction from "./CourseIntroduction";
-import CourseSummary from "./CourseSummary";
 import CourseQuiz from "./CourseQuiz";
-import CourseActivity from "./CourseActivity";
 import { Course } from "@/types/types";
+import InteractiveCoursePartViewer from "@/components/shared/InteractiveCoursePartViewer";
 
 export default function CourseModulePart() {
   // ── Router & Context
@@ -51,15 +49,24 @@ export default function CourseModulePart() {
         </div>
 
         <div className="p-7 prose prose-lg max-w-none text-gray-800 dark:text-gray-300 prose-headings:text-gray-900 dark:prose-headings:text-white prose-a:text-blue-600 dark:prose-a:text-blue-400">
-          {partSlug === "introduction" && (
-            <CourseIntroduction part={currentPart} />
+          {partSlug === "quiz" ? (
+            <CourseQuiz />
+          ) : (
+            <InteractiveCoursePartViewer
+              part={currentPart}
+              fallbackText={
+                {
+                  introduction: "Welcome! This is the introduction section...",
+                  lessons: "Welcome! This is the Summary section...",
+                  activities: "Welcome! This is the Activity section...",
+                }[partSlug || ""] ||
+                "Welcome! This is the introduction section..."
+              }
+              showCompletionBadge={
+                !["lessons", "activities"].includes(partSlug || "")
+              }
+            />
           )}
-          {partSlug === "lessons" && <CourseSummary part={currentPart} />}
-          {partSlug === "quiz" && <CourseQuiz />}
-          {partSlug === "activities" && <CourseActivity part={currentPart} />}
-          {!["introduction", "lessons", "quiz", "activities"].includes(
-            partSlug || "",
-          ) && <CourseIntroduction part={currentPart} />}
         </div>
       </div>
     </div>
