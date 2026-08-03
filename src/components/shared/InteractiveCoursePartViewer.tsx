@@ -25,16 +25,13 @@ export default function InteractiveCoursePartViewer({
   showCompletionBadge = false,
 }: InteractiveCoursePartViewerProps) {
   const { course } = useOutletContext<{ course: Course }>();
-  const { goToNext, hasNext, currentPartSlug } = useNextPart(course);
+  const { goToNext, hasNext, currentPartSlug, modNum } = useNextPart(course);
   const { completePart, currentStudent } = useStudentStore();
   const [marked, setMarked] = useState(false);
 
-  const modNum =
-    Number(window.location.pathname.match(/module-(\d+)/)?.[1]) || 1;
-
   const alreadyCompleted =
     currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
-      currentPartSlug ?? "",
+      `${modNum}:${currentPartSlug ?? ""}`,
     ) ?? false;
 
   const htmlContent = part?.content || `<p>${fallbackText}</p>`;

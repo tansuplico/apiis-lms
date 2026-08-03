@@ -53,6 +53,7 @@ export default function CourseModulePart() {
             <CourseQuiz />
           ) : (
             <InteractiveCoursePartViewer
+              key={currentPart.id}
               part={currentPart}
               fallbackText={
                 {

@@ -106,7 +106,7 @@ export default function CourseQuiz() {
 
   const alreadyCompleted =
     currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
-      currentPartSlug ?? "",
+      `${modNum}:${currentPartSlug ?? ""}`,
     ) ?? false;
 
   const quizKey = `${modNum}:quiz`;
