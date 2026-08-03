@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
+import { validateQuestionShape } from "../utils/quizQuestions";
 
 // ── Constants & regex
 const HEX_COLOR_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
@@ -1411,152 +1412,10 @@ export const updateQuizQuestions = async (req: Request, res: Response) => {
     }
 
     for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      const type = q.type ?? "multiple_choice";
-
-      if (
-        ![
-          "multiple_choice",
-          "identification",
-          "fill_in_the_blank",
-          "true_false",
-          "matching",
-        ].includes(type)
-      ) {
-        res.status(400).json({
-          success: false,
-          message: `Question ${i + 1} has an invalid type.`,
-        });
+      const error = validateQuestionShape(questions[i], i);
+      if (error) {
+        res.status(400).json({ success: false, message: error });
         return;
-      }
-
-      if (!q.question?.trim()) {
-        res.status(400).json({
-          success: false,
-          message: `Question ${i + 1} is missing question text.`,
-        });
-        return;
-      }
-
-      if (q.imageUrl !== undefined && q.imageUrl !== null) {
-        if (
-          typeof q.imageUrl !== "string" ||
-          !QUESTION_IMAGE_REGEX.test(q.imageUrl)
-        ) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} has an invalid image URL.`,
-          });
-          return;
-        }
-        if (q.imageUrl.length > MAX_QUESTION_IMAGE_SIZE) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1}'s image is too large.`,
-          });
-          return;
-        }
-      }
-
-      if (type === "multiple_choice") {
-        if (
-          !Array.isArray(q.options) ||
-          q.options.length < 2 ||
-          q.options.length > MAX_QUIZ_OPTIONS
-        ) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have between 2 and ${MAX_QUIZ_OPTIONS} options.`,
-          });
-          return;
-        }
-        for (let j = 0; j < q.options.length; j++) {
-          if (!q.options[j]?.trim()) {
-            res.status(400).json({
-              success: false,
-              message: `Question ${i + 1}, option ${j + 1} cannot be empty.`,
-            });
-            return;
-          }
-        }
-        if (
-          typeof q.correctOptionIndex !== "number" ||
-          q.correctOptionIndex < 0 ||
-          q.correctOptionIndex >= q.options.length
-        ) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} has an invalid correct option index.`,
-          });
-          return;
-        }
-      } else if (type === "identification") {
-        if (
-          !Array.isArray(q.correctAnswers) ||
-          q.correctAnswers.length < 1 ||
-          q.correctAnswers.length > MAX_IDENTIFICATION_ANSWERS
-        ) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have between 1 and ${MAX_IDENTIFICATION_ANSWERS} accepted answers.`,
-          });
-          return;
-        }
-        for (let j = 0; j < q.correctAnswers.length; j++) {
-          if (!q.correctAnswers[j]?.trim()) {
-            res.status(400).json({
-              success: false,
-              message: `Question ${i + 1}, accepted answer ${j + 1} cannot be empty.`,
-            });
-            return;
-          }
-        }
-      } else if (type === "true_false") {
-        if (typeof q.correctBoolean !== "boolean") {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have a true/false correct answer.`,
-          });
-          return;
-        }
-      } else if (type === "matching") {
-        if (
-          !Array.isArray(q.matchingPairs) ||
-          q.matchingPairs.length < 2 ||
-          q.matchingPairs.length > MAX_MATCHING_PAIRS
-        ) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have between 2 and ${MAX_MATCHING_PAIRS} matching pairs.`,
-          });
-          return;
-        }
-        for (let j = 0; j < q.matchingPairs.length; j++) {
-          const pair = q.matchingPairs[j];
-          if (!pair?.left?.trim() || !pair?.right?.trim()) {
-            res.status(400).json({
-              success: false,
-              message: `Question ${i + 1}, matching pair ${j + 1} must have both sides filled in.`,
-            });
-            return;
-          }
-        }
-      } else {
-        // fill_in_the_blank
-        if (!q.correctAnswer?.trim()) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} is missing a correct answer.`,
-          });
-          return;
-        }
-        if (!q.question.includes("___")) {
-          res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must contain ___ to mark the blank.`,
-          });
-          return;
-        }
       }
     }
 

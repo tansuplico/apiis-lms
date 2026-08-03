@@ -1,20 +1,25 @@
 // src/pages/students/CoursePreview.tsx
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useCenterStore } from "@/stores/useCenterStore";
 
 import PreviewOverview from "@/components/shared/PreviewOverview";
 import PreviewContents from "@/components/shared/PreviewContents";
 import { resolveThumbnailUrl } from "@/utils/imageUtils";
+import { useCourseStore } from "@/stores/useCourseStore";
 
 export default function CoursePreview() {
   // ── Store
   const navigate = useNavigate();
   const location = useLocation();
-  const passedCourse = location.state?.course;
+  const { courseName } = useParams(); // route param, holds the course's numeric id
   const { currentStudent } = useStudentStore();
   const { centers } = useCenterStore();
+  const { courses, isLoading } = useCourseStore();
+
+  const passedCourse =
+    location.state?.course ?? courses.find((c) => c.id === Number(courseName));
 
   const [activeTab, setActiveTab] = useState<"overview" | "content">(
     "overview",
@@ -44,18 +49,30 @@ export default function CoursePreview() {
 
   // ── Handlers: navigation
   const handleOpenCourse = () => {
-    const courseSlug = passedCourse.title
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-
     const startingModuleNum = passedCourse.modules?.[0]?.number || 1;
 
     navigate(
-      `/student/course/${courseSlug}/${startingModuleNum}/introduction`,
+      `/student/course/${passedCourse.id}/module-${startingModuleNum}/introduction`,
       { state: { course: passedCourse } },
     );
   };
+
+  // ── Guards
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 dark:text-gray-400">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!passedCourse) {
+    return (
+      <div className="p-10 text-center text-red-600 dark:text-red-400">
+        Course not found
+      </div>
+    );
+  }
 
   // ── Render
   return (

@@ -2,14 +2,14 @@
 import { useStudentStore } from "@/stores/useStudentStore";
 import { Course } from "@/types/types";
 
-export function useCourseProgress(course: Course) {
+export function useCourseProgress(course: Course | undefined) {
   // ── Store
-  const progress = useStudentStore(
-    (s) => s.currentStudent?.courseProgress?.[course.id] ?? null,
+  const progress = useStudentStore((s) =>
+    course ? (s.currentStudent?.courseProgress?.[course.id] ?? null) : null,
   );
 
   // ── Derived
-  const totalParts = (course.modules ?? []).reduce(
+  const totalParts = (course?.modules ?? []).reduce(
     (sum, mod) => sum + (mod.parts?.length ?? 0),
     0,
   );
@@ -28,7 +28,7 @@ export function useCourseProgress(course: Course) {
     totalParts,
     lastVisitedModule: progress?.lastVisitedModule ?? 1,
     lastVisitedPart:
-      progress?.lastVisitedPart ?? course.modules[0]?.parts[0]?.slug,
+      progress?.lastVisitedPart ?? course?.modules[0]?.parts[0]?.slug,
     isPartCompleted,
   };
 }

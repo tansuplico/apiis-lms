@@ -1,12 +1,12 @@
 // src/pages/admin/Dashboard.tsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   BookOpen,
   Users,
   GraduationCap,
   BarChart3,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { useAdminStore } from "@/stores/useAdminStore";
 import { useCenterStore } from "@/stores/useCenterStore";
@@ -25,13 +25,11 @@ export default function AdminDashboard() {
 
   // ── State: ticket counts
   const [ticketStats, setTicketStats] = useState({ pending: 0, inProgress: 0 });
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   // ── Effects: fetch ticket stats on mount
   useEffect(() => {
     let cancelled = false;
     const fetchStats = async () => {
-      setIsLoadingStats(true);
       try {
         const [openRes, inProgressRes] = await Promise.all([
           apiClient.get("/tickets?status=Open&limit=1"),
@@ -45,8 +43,6 @@ export default function AdminDashboard() {
         }
       } catch (err) {
         console.error("Failed to fetch ticket stats", err);
-      } finally {
-        if (!cancelled) setIsLoadingStats(false);
       }
     };
     fetchStats();
@@ -63,36 +59,54 @@ export default function AdminDashboard() {
     return "Good evening";
   })();
 
+  const HERO_GRADIENTS = [
+    "from-indigo-600 to-purple-700 dark:from-indigo-800 dark:to-purple-900",
+    "from-blue-600 to-indigo-700 dark:from-blue-800 dark:to-indigo-900",
+    "from-violet-600 to-indigo-700 dark:from-violet-800 dark:to-indigo-900",
+  ];
+  const [heroGradient] = useState(
+    () => HERO_GRADIENTS[Math.floor(Math.random() * HERO_GRADIENTS.length)],
+  );
+
   // ── Render
   return (
     <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Hero Banner */}
-      <div className="bg-linear-to-r from-indigo-600 to-purple-700 dark:from-indigo-800 dark:to-purple-900 rounded-2xl p-8 md:p-12 text-white shadow-xl">
-        <h1 className="text-3xl md:text-5xl font-extrabold mb-3">
-          {greeting}, Admin {currentAdmin?.firstName}
-        </h1>
-        <p className="text-lg md:text-xl opacity-90 mb-6">
-          Overview{" "}
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-        <div className="flex flex-wrap gap-4">
-          <Link
-            to="/admin/students"
-            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
-          >
-            <Users size={18} /> Manage Students
-          </Link>
-          <Link
-            to="/admin/attendance"
-            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
-          >
-            <BarChart3 size={18} /> View Attendance
-          </Link>
+      <div
+        className={`relative rounded-3xl overflow-hidden bg-linear-to-r ${heroGradient}`}
+      >
+        <div className="px-8 pt-8 pb-12 text-white">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles size={20} className="opacity-90" strokeWidth={2} />
+            <span className="text-sm font-semibold uppercase tracking-wide opacity-90">
+              {greeting}
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold mb-2">
+            Hi, Admin {currentAdmin?.firstName}!
+          </h1>
+          <p className="text-base md:text-lg opacity-90">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
         </div>
+
+        {/* Scalloped edge — matches the student dashboard's hero treatment */}
+        <svg
+          className="absolute bottom-0 left-0 w-full text-white dark:text-gray-950"
+          style={{ height: "22px" }}
+          viewBox="0 0 1200 22"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M0,22 L0,11 Q50,-3 100,11 T200,11 T300,11 T400,11 T500,11 T600,11 T700,11 T800,11 T900,11 T1000,11 T1100,11 T1200,11 L1200,22 Z"
+          />
+        </svg>
       </div>
 
       {/* Quick Stats */}
@@ -115,37 +129,24 @@ export default function AdminDashboard() {
           value={facilitators.length}
           color="purple"
         />
+        <StatCard
+          icon={<ShieldCheck size={28} />}
+          title="Pending Tickets"
+          value={ticketStats.pending}
+          link="/admin/tickets"
+          color="yellow"
+        />
+        <StatCard
+          icon={<BarChart3 size={28} />}
+          title="In Progress Tickets"
+          value={ticketStats.inProgress}
+          link="/admin/tickets"
+          color="blue"
+        />
       </div>
 
       {/* Centers Overview Table */}
       <CentersOverviewTable centers={centers} facilitators={facilitators} />
-
-      {/* Quick Actions Panel */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {isLoadingStats ? (
-          <>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 animate-pulse h-32"></div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 animate-pulse h-32"></div>
-          </>
-        ) : (
-          <>
-            <StatCard
-              icon={<ShieldCheck size={28} />}
-              title="Pending Tickets"
-              value={ticketStats.pending}
-              link="/admin/tickets"
-              color="yellow"
-            />
-            <StatCard
-              icon={<BarChart3 size={28} />}
-              title="In Progress Tickets"
-              value={ticketStats.inProgress}
-              link="/admin/tickets"
-              color="blue"
-            />
-          </>
-        )}
-      </section>
     </div>
   );
 }

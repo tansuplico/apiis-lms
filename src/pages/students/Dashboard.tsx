@@ -68,13 +68,9 @@ export default function Dashboard() {
 
   // ── Handlers: navigate to course preview
   const handleClick = (course: any) => {
-    const slug =
-      course.slug ||
-      course.title
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "");
-    navigate(`/student/courses/${slug}/course-preview`, { state: { course } });
+    navigate(`/student/courses/${course.id}/course-preview`, {
+      state: { course },
+    });
   };
 
   // ── Guard: not logged in

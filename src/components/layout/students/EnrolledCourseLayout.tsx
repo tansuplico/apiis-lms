@@ -196,7 +196,7 @@ export default function EnrolledCourseLayout() {
   }, [expandedModule, course]);
 
   // ── Derived: progress helper
-  const { isPartCompleted } = useCourseProgress(course!);
+  const { isPartCompleted } = useCourseProgress(course);
 
   // ── Handlers: file download
   const handleFileDownload = async (
@@ -351,7 +351,7 @@ export default function EnrolledCourseLayout() {
                 <div
                   className={`ml-11 mt-0 overflow-hidden transition-all duration-300 ease-in-out ${
                     isExpanded
-                      ? "max-h-[1000px] opacity-100 py-2"
+                      ? "max-h-250 opacity-100 py-2"
                       : "max-h-0 opacity-0"
                   }`}
                 >

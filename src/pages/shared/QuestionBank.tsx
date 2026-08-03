@@ -339,8 +339,11 @@ export default function QuestionBank() {
         return "Fill in both sides of every matching pair.";
     } else if (draft.type === "fill_in_the_blank") {
       if (!draft.correctAnswer?.trim()) return "Enter the correct answer.";
-      if (!draft.question.includes("___"))
+      const blankCount = draft.question.split("___").length - 1;
+      if (blankCount === 0)
         return 'Use "___" in the question text to mark the blank.';
+      if (blankCount > 1)
+        return 'Only one "___" blank is supported per question, split this into separate questions.';
     }
     return null;
   };

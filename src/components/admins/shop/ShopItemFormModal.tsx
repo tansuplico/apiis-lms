@@ -11,24 +11,8 @@ import { toast } from "react-toastify";
 import { Accessory, AccessoryCategory, Role } from "@/types/types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
-const COLOR_SWATCHES = [
-  "#3B82F6",
-  "#0070FF",
-  "#6366F1",
-  "#8B5CF6",
-  "#EC4899",
-  "#EF4444",
-  "#F59E0B",
-  "#F97316",
-  "#10B981",
-  "#14B8A6",
-  "#06B6D4",
-  "#84CC16",
-  "#6B7280",
-  "#1F2937",
-  "#000000",
-  "#FFFFFF",
-];
+const DEFAULT_COLOR = "#3B82F6";
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 
 const CATEGORIES: AccessoryCategory[] = ["Cover Photo Color", "Profile Avatar"];
 
@@ -46,7 +30,7 @@ const EMPTY_FORM: FormState = {
   name: "",
   category: "Cover Photo Color",
   price: "",
-  color: COLOR_SWATCHES[0],
+  color: DEFAULT_COLOR,
   avatarFile: null,
   avatarPreview: "",
   targetRole: null,
@@ -110,7 +94,7 @@ export default function ShopItemFormModal({
           color:
             editingItem.category === "Cover Photo Color"
               ? editingItem.color
-              : COLOR_SWATCHES[0],
+              : DEFAULT_COLOR,
           avatarFile: null,
           avatarPreview:
             editingItem.category === "Profile Avatar" ? editingItem.avatar : "",
@@ -136,7 +120,7 @@ export default function ShopItemFormModal({
     form.price !== "" &&
     Number(form.price) > 0 &&
     (form.category === "Cover Photo Color"
-      ? form.color !== ""
+      ? HEX_COLOR_REGEX.test(form.color)
       : form.avatarPreview !== "");
 
   // ── Handlers
@@ -155,7 +139,7 @@ export default function ShopItemFormModal({
       category: cat,
       avatarFile: null,
       avatarPreview: "",
-      color: COLOR_SWATCHES[0],
+      color: DEFAULT_COLOR,
       targetRole: null,
     }));
   };
@@ -188,7 +172,7 @@ export default function ShopItemFormModal({
 
   // ── Render
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-99">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -276,33 +260,36 @@ export default function ShopItemFormModal({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Color <span className="text-red-500">*</span>
               </label>
-              <div className="flex flex-wrap gap-2.5">
-                {COLOR_SWATCHES.map((hex) => (
-                  <button
-                    key={hex}
-                    onClick={() => setForm((f) => ({ ...f, color: hex }))}
-                    className="w-8 h-8 rounded-lg border-2 transition-all cursor-pointer"
-                    style={{
-                      backgroundColor: hex,
-                      borderColor:
-                        form.color === hex ? "#0070FF" : "transparent",
-                      boxShadow:
-                        form.color === hex ? "0 0 0 2px #0070FF" : "none",
-                      outline: hex === "#FFFFFF" ? "1px solid #d1d5db" : "none",
-                    }}
-                    title={hex}
-                  />
-                ))}
-              </div>
-              <div className="mt-3 flex items-center gap-3">
-                <div
-                  className="w-12 h-8 rounded-lg border border-gray-200 dark:border-gray-600"
-                  style={{ backgroundColor: form.color }}
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={
+                    HEX_COLOR_REGEX.test(form.color)
+                      ? form.color
+                      : DEFAULT_COLOR
+                  }
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, color: e.target.value }))
+                  }
+                  title="Pick a color"
+                  className="w-14 h-14 shrink-0 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-lg [&::-webkit-color-swatch]:border-none"
                 />
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                  {form.color}
-                </span>
+                <input
+                  type="text"
+                  value={form.color}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, color: e.target.value }))
+                  }
+                  placeholder="#3B82F6"
+                  maxLength={7}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                />
               </div>
+              {form.color !== "" && !HEX_COLOR_REGEX.test(form.color) && (
+                <p className="mt-1.5 text-xs text-red-500">
+                  Enter a valid hex color, e.g. #3B82F6
+                </p>
+              )}
             </div>
           )}
 

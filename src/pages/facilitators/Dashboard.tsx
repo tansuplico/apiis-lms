@@ -1,5 +1,5 @@
 // src/pages/facilitators/Dashboard.tsx
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -7,7 +7,7 @@ import {
   ArrowRight,
   Calendar,
   ChevronRight,
-  BarChart3,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
@@ -33,6 +33,15 @@ export default function Dashboard() {
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   })();
+
+  const HERO_GRADIENTS = [
+    "from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800",
+    "from-sky-600 to-blue-700 dark:from-sky-800 dark:to-blue-900",
+    "from-indigo-600 to-blue-700 dark:from-indigo-800 dark:to-blue-900",
+  ];
+  const [heroGradient] = useState(
+    () => HERO_GRADIENTS[Math.floor(Math.random() * HERO_GRADIENTS.length)],
+  );
 
   // ── Derived: assigned centers
   const myCenters = useMemo(
@@ -101,32 +110,41 @@ export default function Dashboard() {
   return (
     <div className="space-y-10 pb-10 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       {/* Hero Greeting */}
-      <div className="bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800 rounded-2xl p-8 md:p-12 text-white shadow-xl">
-        <h1 className="text-3xl md:text-5xl font-extrabold mb-3">
-          {greeting}, Facilitator {currentFacilitator.firstName}
-        </h1>
-        <p className="text-lg md:text-xl opacity-90 mb-6">
-          Overview{" "}
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-        <div className="flex flex-wrap gap-4">
-          <Link
-            to="/facilitator/students"
-            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
-          >
-            <Users size={18} /> Manage Students
-          </Link>
-          <Link
-            to="/facilitator/attendance"
-            className="flex items-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-medium backdrop-blur-sm transition-all"
-          >
-            <BarChart3 size={18} /> View Attendance
-          </Link>
+      <div
+        className={`relative rounded-3xl overflow-hidden bg-linear-to-r ${heroGradient}`}
+      >
+        <div className="px-8 pt-8 pb-12 text-white">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles size={20} className="opacity-90" strokeWidth={2} />
+            <span className="text-sm font-semibold uppercase tracking-wide opacity-90">
+              {greeting}
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold mb-2">
+            Hi, Facilitator {currentFacilitator.firstName}!
+          </h1>
+          <p className="text-base md:text-lg opacity-90">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
         </div>
+
+        {/* Scalloped edge — matches the student dashboard's hero treatment */}
+        <svg
+          className="absolute bottom-0 left-0 w-full text-white dark:text-gray-950"
+          style={{ height: "22px" }}
+          viewBox="0 0 1200 22"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M0,22 L0,11 Q50,-3 100,11 T200,11 T300,11 T400,11 T500,11 T600,11 T700,11 T800,11 T900,11 T1000,11 T1100,11 T1200,11 L1200,22 Z"
+          />
+        </svg>
       </div>
 
       {/* Quick Stats Cards */}

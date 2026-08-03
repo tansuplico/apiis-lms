@@ -1,25 +1,14 @@
 // src/utils/quizQuestions.ts
-//
-// Shared logic for quiz questions, used by both courseController's
-// direct quiz editor (quiz_questions table) and questionBankController's
-// reusable question bank (question_bank table). Keeping validation and
-// question_data serialization in one place means a new question type only
-// has to be taught here, not duplicated across two controllers.
+
 import pool from "../config/db";
 
 export const MAX_QUIZ_OPTIONS = 6;
 export const MAX_MATCHING_PAIRS = 6;
 export const MAX_IDENTIFICATION_ANSWERS = 10;
-// Question images are embedded as base64 data URIs (same pattern as course
-// content images), not just http(s)/api URLs — hence the separate regex.
 export const QUESTION_IMAGE_REGEX =
   /^(https?:\/\/.+|\/api\/.+|data:image\/(jpeg|png|webp|gif);base64,.+)/;
-export const MAX_QUESTION_IMAGE_SIZE = 1.5 * 1024 * 1024; // base64 string length
+export const MAX_QUESTION_IMAGE_SIZE = 1.5 * 1024 * 1024;
 
-/**
- * Validates a single question object (from the quiz editor or the bank
- * form). Returns an error message string if invalid, or null if valid.
- */
 export function validateQuestionShape(q: any, index: number): string | null {
   const label = `Question ${index + 1}`;
   const type = q.type ?? "multiple_choice";
@@ -108,8 +97,12 @@ export function validateQuestionShape(q: any, index: number): string | null {
     if (!q.correctAnswer?.trim()) {
       return `${label} is missing a correct answer.`;
     }
-    if (!q.question.includes("___")) {
+    const blankCount = (q.question.match(/___/g) ?? []).length;
+    if (blankCount === 0) {
       return `${label} must contain ___ to mark the blank.`;
+    }
+    if (blankCount > 1) {
+      return `${label} can only have one ___ blank, split this into separate questions.`;
     }
   }
 

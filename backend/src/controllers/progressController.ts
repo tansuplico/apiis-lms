@@ -690,6 +690,8 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
     );
 
     let coinsToAward = 0;
+    let questions: { id: number; question_data: any }[] = [];
+    let correct = 0;
 
     if (quizPartResult.rows.length > 0) {
       const questionsResult = await pool.query(
@@ -715,8 +717,7 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
       const level = courseResult.rows[0]?.level ?? "Beginner";
       const difficultyCoins = COIN_REWARDS_BY_DIFFICULTY[level] ?? 5;
 
-      const questions = questionsResult.rows;
-      let correct = 0;
+      questions = questionsResult.rows;
 
       questions.forEach((q) => {
         const qd = q.question_data;
@@ -735,13 +736,31 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
       await client.query("BEGIN");
 
       const existing = await client.query(
-        `SELECT id, coins_awarded FROM student_quiz_answers
+        `SELECT id, answers, coins_awarded FROM student_quiz_answers
          WHERE student_id = $1 AND course_id = $2 AND module_number = $3`,
         [studentId, courseId, moduleNumber],
       );
 
       const alreadyClaimed =
         existing.rows.length > 0 && existing.rows[0].coins_awarded > 0;
+
+      // Once an attempt has been recorded and coins claimed, a retake
+      // should never make the student's recorded grade worse — only
+      // overwrite the saved answers if this attempt scores at least as
+      // well as the one already on file.
+      let answersToStore = answers;
+      if (alreadyClaimed && questions.length > 0) {
+        const previousAnswers = existing.rows[0].answers ?? {};
+        let previousCorrect = 0;
+        questions.forEach((q) => {
+          const qd = q.question_data;
+          const prevAns = previousAnswers[String(q.id)];
+          if (isAnswerCorrect(qd, prevAns)) previousCorrect++;
+        });
+        if (correct < previousCorrect) {
+          answersToStore = previousAnswers;
+        }
+      }
 
       await client.query(
         `INSERT INTO student_quiz_answers
@@ -759,7 +778,7 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
           studentId,
           courseId,
           moduleNumber,
-          JSON.stringify(answers),
+          JSON.stringify(answersToStore),
           alreadyClaimed ? 0 : coinsToAward,
         ],
       );
@@ -780,7 +799,7 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
         message: alreadyClaimed
           ? "Quiz answers saved. Coins already claimed for this module."
           : `Quiz answers saved. ${coinsAwarded} coins awarded.`,
-        data: { coinsAwarded, alreadyClaimed },
+        data: { coinsAwarded, alreadyClaimed, answers: answersToStore },
       });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -834,9 +853,16 @@ export const purchaseAccessory = async (req: AuthRequest, res: Response) => {
 
       const price = accessoryResult.rows[0].price;
 
+      const studentResult = await client.query(
+        `SELECT coins FROM students WHERE id = $1 FOR UPDATE`,
+        [studentId],
+      );
+
+      const coins = studentResult.rows[0]?.coins ?? 0;
+
       const alreadyOwned = await client.query(
         `SELECT id FROM student_accessories
-         WHERE student_id = $1 AND accessory_id = $2`,
+        WHERE student_id = $1 AND accessory_id = $2`,
         [studentId, accessoryId],
       );
 
@@ -847,13 +873,6 @@ export const purchaseAccessory = async (req: AuthRequest, res: Response) => {
           .json({ success: false, message: "Accessory already owned." });
         return;
       }
-
-      const studentResult = await client.query(
-        `SELECT coins FROM students WHERE id = $1`,
-        [studentId],
-      );
-
-      const coins = studentResult.rows[0]?.coins ?? 0;
 
       if (coins < price) {
         await client.query("ROLLBACK");

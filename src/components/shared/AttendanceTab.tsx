@@ -186,13 +186,12 @@ export default function AttendanceTab({
                 </h3>
                 {isSundaySelected ? (
                   <span className="text-sm text-red-600 dark:text-red-400 font-medium">
-                    Attendance cannot be recorded on Sundays — pick another date
+                    Attendance cannot be recorded on Sundays.
                   </span>
                 ) : (
                   alreadySavedOnDate && (
                     <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                      ✓ Already saved for this date — saving again will
-                      overwrite
+                      Already saved for this date, saving again will overwrite
                     </span>
                   )
                 )}

@@ -86,23 +86,17 @@ function isQuestionCorrect(q: QuizQuestion, answer: StudentAnswer): boolean {
 export default function CourseQuiz() {
   // ── Store & hooks
   const { course } = useOutletContext<{ course: Course }>();
-  const { goToNext, hasNext, currentPartSlug } = useNextPart(course);
+  // After
+  const { goToNext, hasNext, currentPartSlug, modNum } = useNextPart(course);
   const { completePart, currentStudent, saveQuizAnswers } = useStudentStore();
 
-  // ── Derived: module & quiz
-  const modNum =
-    Number(window.location.pathname.match(/module-(\d+)/)?.[1]) || 1;
+  // ── Derived: quiz
   const currentModule = course.modules.find((m) => m.number === modNum);
   const quizPart = currentModule?.parts.find((p) => p.slug === "quiz");
   const questions = quizPart?.quizQuestions ?? [];
   // Defaults to true for parts saved before this setting existed.
   const revealAnswers = quizPart?.showCorrectAnswers ?? true;
 
-  // Each student sees questions in a randomized order. Answers are keyed by
-  // question id (not position — see handleAnswerSelect below), so shuffling
-  // is purely cosmetic and never affects grading. The order is stable while
-  // answering (doesn't reshuffle on every re-render) but re-rolls whenever
-  // this quiz part changes or the student hits "Try Again" (shuffleSeed).
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const shuffledQuestions = useMemo(
     () => shuffleArray(questions),
