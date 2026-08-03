@@ -93,17 +93,6 @@ app.use(
 app.use(morgan(isDev ? "dev" : "combined"));
 
 // ── Rate limiters
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isDev ? 100 : 10,
-  skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many login attempts, please try again later.",
-  },
-});
 
 const userOrIpKeyGenerator = (req: express.Request): string => {
   const authHeader = req.headers.authorization;
@@ -152,7 +141,7 @@ app.use((_req, res, next) => {
 });
 
 // ── Routes
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/students", apiLimiter, studentRoutes);
 app.use("/api/facilitators", apiLimiter, facilitatorRoutes);
 app.use("/api/admins", apiLimiter, adminRoutes);

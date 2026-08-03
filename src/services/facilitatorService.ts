@@ -1,4 +1,5 @@
-import { apiClient } from "./apiClient";
+import { toast } from "react-toastify";
+import { apiClient, ApiError } from "./apiClient";
 import { tokenStorage } from "./tokenStorage";
 import { Facilitator, AccountStatus } from "@/types/types";
 
@@ -19,9 +20,13 @@ export const facilitatorService = {
   logout: async (): Promise<void> => {
     try {
       await apiClient.post("/auth/logout", {});
-    } catch {
-      // Best-effort — proceed to clear the local token regardless (e.g.
-      // offline, or the session was already invalidated server-side).
+    } catch (err) {
+      console.error("logout request failed:", err);
+      if (!(err instanceof ApiError) || err.statusCode !== 401) {
+        toast.warn(
+          "Logout may not have fully synced with the server. If you have trouble logging back in right away, wait a few minutes and try again.",
+        );
+      }
     } finally {
       await tokenStorage.clearToken();
     }
