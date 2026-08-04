@@ -13,6 +13,7 @@ import { toast } from "react-toastify";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
 import { useCenterStore } from "@/stores/useCenterStore";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
+import CenterGridCard from "@/components/shared/CenterGridCard";
 import { parseDateKey } from "@/utils/dateformatter";
 
 export default function Dashboard() {
@@ -34,6 +35,10 @@ export default function Dashboard() {
     return "Good evening";
   })();
 
+  // ── Hero banner gradient — picked once per mount, so it re-shuffles every
+  // time the facilitator navigates to the Dashboard (route change unmounts
+  // this component). Stays within the existing blue/indigo facilitator
+  // system rather than the student-only color tokens.
   const HERO_GRADIENTS = [
     "from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800",
     "from-sky-600 to-blue-700 dark:from-sky-800 dark:to-blue-900",
@@ -216,65 +221,14 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Center Cards */}
+            {/* Center Cards — first 3 only; see all on the Centers page */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myCenters.map((center) => (
-                <div
+              {myCenters.slice(0, 3).map((center) => (
+                <CenterGridCard
                   key={center.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700 cursor-pointer"
-                  onClick={() =>
-                    navigate(`/facilitator/centers/${center.id}/view`)
-                  }
-                >
-                  <div
-                    className="relative h-48 w-full overflow-hidden"
-                    style={{ backgroundColor: center.coverColor }}
-                  >
-                    <img
-                      src={center.thumbnailUrl ?? "/module-thumbnail.png"}
-                      alt={`${center.title} thumbnail`}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        if (!img.dataset.errored) {
-                          img.dataset.errored = "1";
-                          img.src = "/module-thumbnail.png";
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="px-6 py-5 flex flex-col gap-4 grow">
-                    <h4 className="text-xl text-gray-900 dark:text-white">
-                      {center.title}
-                    </h4>
-                    <div className="flex flex-col gap-2.5 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-2.5">
-                        <BookOpen
-                          size={18}
-                          className="text-gray-500 dark:text-gray-400"
-                        />
-                        <span>{center.courses.length} Courses</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Users
-                          size={18}
-                          className="text-gray-500 dark:text-gray-400"
-                        />
-                        <span>{center.students.length} Students Enrolled</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/facilitator/centers/${center.id}/view`);
-                      }}
-                      className="mt-auto w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-colors cursor-pointer"
-                    >
-                      Open Center
-                    </button>
-                  </div>
-                </div>
+                  center={center}
+                  role="facilitator"
+                />
               ))}
             </div>
 

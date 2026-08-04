@@ -29,6 +29,7 @@ export default function ProgressTab({
     CourseProgress
   > | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [coins, setCoins] = useState<number | null>(null);
 
   // ── Handlers
   const fetchProgress = async (student: Student) => {
@@ -38,13 +39,16 @@ export default function ProgressTab({
       if (!isOnline()) {
         const cached = getCachedProgress(student.id);
         setProgress(cached);
+        setCoins(student.coins ?? null);
         return;
       }
       const data = await studentService.getProgressById(student.id);
       setProgress(data.courseProgress);
+      setCoins(data.coins);
       cacheProgress(student.id, data.courseProgress);
     } catch {
       setProgress(null);
+      setCoins(null);
     } finally {
       setIsLoading(false);
     }
@@ -171,7 +175,7 @@ export default function ProgressTab({
               <div className="ml-auto text-right">
                 <p className="text-sm text-gray-500 dark:text-gray-400">Gems</p>
                 <p className="text-2xl font-bold text-yellow-500">
-                  {selectedStudent.coins ?? 0}
+                  {coins ?? 0}
                 </p>
               </div>
             </div>

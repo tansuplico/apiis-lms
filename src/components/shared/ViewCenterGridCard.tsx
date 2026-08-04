@@ -32,7 +32,7 @@ export default function ViewCenterGridCard({
   // ── Render
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg dark:hover:shadow-xl overflow-hidden flex flex-col h-full cursor-pointer border border-gray-200 dark:border-gray-700 relative group"
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg dark:hover:shadow-xl hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col h-full cursor-pointer border border-gray-200 dark:border-gray-700 relative group"
       onClick={onClickCourse ? () => onClickCourse(course) : handleClick}
     >
       {/* Thumbnail */}
@@ -53,7 +53,7 @@ export default function ViewCenterGridCard({
         <img
           src={resolveThumbnailUrl(thumbnailUrl)}
           alt={course.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           loading="lazy"
           onLoad={onThumbnailSettled}
           onError={(e) => {

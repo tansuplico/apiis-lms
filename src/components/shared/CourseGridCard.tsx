@@ -23,7 +23,7 @@ export default function CourseGridCard({
   // ── Render
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl dark:hover:shadow-2xl overflow-hidden flex flex-col h-full cursor-pointer border border-gray-200 dark:border-gray-700 transition-shadow"
+      className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl dark:hover:shadow-2xl hover:-translate-y-1 overflow-hidden flex flex-col h-full cursor-pointer border border-gray-200 dark:border-gray-700 transition-all duration-200"
       onClick={handleClick}
     >
       <div
@@ -43,7 +43,7 @@ export default function CourseGridCard({
         <img
           src={resolveThumbnailUrl(thumbnailUrl)}
           alt={course.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           loading="lazy"
           onLoad={onThumbnailSettled}
           onError={(e) => {

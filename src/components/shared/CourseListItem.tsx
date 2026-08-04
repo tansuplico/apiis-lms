@@ -24,7 +24,7 @@ export default function CourseListItem({
   return (
     <div
       onClick={handleClick}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col sm:flex-row items-stretch border border-gray-200 dark:border-gray-700 cursor-pointer"
+      className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 overflow-hidden flex flex-col sm:flex-row items-stretch border border-gray-200 dark:border-gray-700 cursor-pointer"
     >
       {/* Thumbnail */}
       <div
@@ -45,7 +45,7 @@ export default function CourseListItem({
         <img
           src={resolveThumbnailUrl(thumbnailUrl)}
           alt={course.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           loading="lazy"
           onLoad={onThumbnailSettled}
           onError={(e) => {

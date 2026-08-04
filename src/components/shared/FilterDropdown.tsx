@@ -41,7 +41,7 @@ export default function FilterDropdown({
     options.find((o) => o.value === value)?.label ?? options[0]?.label ?? "";
 
   return (
-    <div className="relative z-98" ref={containerRef}>
+    <div className="relative z-50" ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

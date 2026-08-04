@@ -239,12 +239,12 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       await studentService.changePassword(current, newPassword);
       const currentStudent = get().currentStudent;
       if (currentStudent) {
-        set({
-          currentStudent: {
-            ...currentStudent,
-            mustChangePassword: false,
-          },
-        });
+        const updatedStudent = {
+          ...currentStudent,
+          mustChangePassword: false,
+        };
+        set({ currentStudent: updatedStudent });
+        await saveLocalSession(updatedStudent);
       }
       return true;
     } catch (err: any) {

@@ -16,6 +16,7 @@ import {
   ArrowLeftRight,
   Check,
   Search,
+  Filter,
 } from "lucide-react";
 import {
   BankQuestion,
@@ -30,6 +31,7 @@ import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkelet
 import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
 import { useSearchParams } from "react-router-dom";
 
@@ -339,11 +341,8 @@ export default function QuestionBank() {
         return "Fill in both sides of every matching pair.";
     } else if (draft.type === "fill_in_the_blank") {
       if (!draft.correctAnswer?.trim()) return "Enter the correct answer.";
-      const blankCount = draft.question.split("___").length - 1;
-      if (blankCount === 0)
+      if (!draft.question.includes("___"))
         return 'Use "___" in the question text to mark the blank.';
-      if (blankCount > 1)
-        return 'Only one "___" blank is supported per question, split this into separate questions.';
     }
     return null;
   };
@@ -762,22 +761,30 @@ export default function QuestionBank() {
               </button>
             )}
           </div>
-          <select
+          <FilterDropdown
             value={typeFilter}
-            onChange={(e) =>
-              setTypeFilter(e.target.value as QuizQuestionType | "all")
-            }
-            className="px-3 py-2.5 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600 sm:w-56 shrink-0"
-          >
-            <option value="all">All types</option>
-            {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
-              (type) => (
-                <option key={type} value={type}>
-                  {QUESTION_TYPE_LABELS[type]}
-                </option>
+            onChange={(v) => setTypeFilter(v as QuizQuestionType | "all")}
+            options={[
+              { value: "all", label: "All types" },
+              ...(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
+                (type) => ({
+                  value: type,
+                  label: QUESTION_TYPE_LABELS[type],
+                }),
               ),
-            )}
-          </select>
+            ]}
+            icon={
+              <Filter
+                size={14}
+                className={
+                  typeFilter !== "all"
+                    ? "text-white"
+                    : "text-gray-500 dark:text-gray-400"
+                }
+              />
+            }
+            active={typeFilter !== "all"}
+          />
         </div>
       )}
 

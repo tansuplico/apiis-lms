@@ -52,7 +52,7 @@ export default function CenterGridCard({
 
   // ── Render
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl overflow-hidden flex flex-col h-full border border-gray-200 dark:border-gray-700">
+    <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 overflow-hidden flex flex-col h-full border border-gray-200 dark:border-gray-700">
       {/* Thumbnail */}
       <div
         className="relative h-48 w-full overflow-hidden"
@@ -71,7 +71,7 @@ export default function CenterGridCard({
         <img
           src={resolveThumbnailUrl(center.thumbnailUrl)}
           alt={`${center.title} thumbnail`}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           loading="lazy"
           onLoad={onImageLoad}
           onError={(e) => {
