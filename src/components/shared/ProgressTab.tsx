@@ -1,9 +1,8 @@
 // src/components/shared/ProgressTab.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Student, Course, CourseProgress } from "@/types/types";
 import { studentService } from "@/services/studentService";
 import { ChevronRight } from "lucide-react";
-import GradebookView from "./GradebookView";
 import { isOnline } from "@/services/networkStatus";
 import { useStudentProgressCache } from "@/stores/useStudentProgressCache";
 import { resolveProfilePicture } from "@/utils/imageUtils";
@@ -23,7 +22,6 @@ export default function ProgressTab({
 
   // ── State
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [progress, setProgress] = useState<Record<
     number,
     CourseProgress
@@ -54,16 +52,12 @@ export default function ProgressTab({
     }
   };
 
-  // ── Render
-  if (selectedStudent && selectedCourse) {
-    return (
-      <GradebookView
-        student={selectedStudent}
-        course={selectedCourse}
-        onBack={() => setSelectedCourse(null)}
-      />
-    );
-  }
+  useEffect(() => {
+    if (!selectedStudent && centerStudents.length > 0) {
+      void fetchProgress(centerStudents[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerStudents]);
 
   return (
     <div className="flex gap-6 min-h-125">
@@ -207,13 +201,6 @@ export default function ProgressTab({
                     key={course.id}
                     className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 space-y-4"
                   >
-                    <button
-                      onClick={() => setSelectedCourse(course)}
-                      className="text-xs text-blue-500 dark:text-blue-400 mt-2 cursor-pointer hover:underline"
-                    >
-                      View gradebook
-                    </button>
-
                     {/* Course Header */}
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-gray-900 dark:text-white">

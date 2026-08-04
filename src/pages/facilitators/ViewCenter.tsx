@@ -8,6 +8,7 @@ import {
   BookOpen,
   CalendarCheck,
   ChartBar,
+  ClipboardList,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -26,6 +27,7 @@ import AttendanceTab from "@/components/shared/AttendanceTab";
 import ViewStudents from "@/components/shared/ViewStudents";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import { toast } from "react-toastify";
+import CenterGradebookOverview from "@/components/shared/CenterGradebookOverview";
 
 export default function ViewCenter() {
   // ── Store
@@ -43,13 +45,15 @@ export default function ViewCenter() {
       | "courses"
       | "students"
       | "attendance"
-      | "progress") ?? "courses";
+      | "progress"
+      | "gradebook") ?? "courses";
 
   const setActiveTab = (
-    tab: "courses" | "students" | "attendance" | "progress",
+    tab: "courses" | "students" | "attendance" | "progress" | "gradebook",
   ) => {
     setSearchParams({ tab });
   };
+
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [modalSearchTerm, setModalSearchTerm] = useState("");
@@ -179,6 +183,13 @@ export default function ViewCenter() {
         >
           <ChartBar size={20} /> Progress
         </button>
+
+        <button
+          onClick={() => setActiveTab("gradebook")}
+          className={tabClass("gradebook")}
+        >
+          <ClipboardList size={20} /> Gradebook
+        </button>
       </div>
 
       {/* Courses Tab */}
@@ -280,6 +291,14 @@ export default function ViewCenter() {
       {/* Progress Tab */}
       {activeTab === "progress" && (
         <ProgressTab centerStudents={centerStudents} courses={centerCourses} />
+      )}
+
+      {/* Gradebook Tab */}
+      {activeTab === "gradebook" && (
+        <CenterGradebookOverview
+          centerId={currentCenter.id}
+          courses={centerCourses}
+        />
       )}
 
       {showRemoveCourseModal && courseToRemove && (
