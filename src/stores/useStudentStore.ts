@@ -6,7 +6,7 @@ import { tokenStorage } from "@/services/tokenStorage";
 import { toast } from "react-toastify";
 import { useShopStore } from "./useShopStore";
 import { syncCoursesToLocal } from "@/services/syncService";
-import { checkOnline, isOnline } from "@/services/networkStatus";
+import { isOnline } from "@/services/networkStatus";
 import { useCourseStore } from "./useCourseStore";
 import {
   clearLocalSession,
@@ -23,6 +23,7 @@ import {
 } from "@/services/offlineProgressService";
 import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
+import { withNetworkRetry } from "@/services/networkRetryService";
 
 interface StudentStore {
   currentStudent: Student | null;
@@ -61,6 +62,27 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
   // ── Actions: restore session
   restoreSession: async () => {
+    const restoreFromLocalCache = async (): Promise<{
+      coursesFetched: boolean;
+    }> => {
+      const localStudent = await loadLocalSession();
+      if (localStudent) {
+        set({ currentStudent: localStudent, isAuthenticated: true });
+        try {
+          await useShopStore.getState().fetchItems();
+        } catch (err) {
+          console.error("fetchItems failed restoring from cache:", err);
+        }
+        try {
+          await useCourseStore.getState().fetchCourses();
+        } catch (err) {
+          console.error("fetchCourses failed restoring from cache:", err);
+        }
+        return { coursesFetched: true };
+      }
+      return { coursesFetched: false };
+    };
+
     try {
       const role = await tokenStorage.getRole();
       if (role !== "student") return { coursesFetched: false };
@@ -69,57 +91,59 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       if (!token) return { coursesFetched: false };
 
       const payload = JSON.parse(atob(token.split(".")[1]));
-      const online = await checkOnline();
+
+      if (!isOnline()) {
+        return await restoreFromLocalCache();
+      }
 
       if (payload.exp && payload.exp * 1000 < Date.now()) {
-        if (online) {
-          await tokenStorage.clearAllTokens();
-          await clearLocalSession();
-          return { coursesFetched: false };
-        }
+        await tokenStorage.clearAllTokens();
+        await clearLocalSession();
+        set({ currentStudent: null, isAuthenticated: false });
+        return { coursesFetched: false };
       }
 
-      if (online) {
-        const student = await studentService.getById(payload.id);
-        const progress = await studentService.getProgress();
+      const [student, progress] = await withNetworkRetry(() =>
+        Promise.all([
+          studentService.getById(payload.id),
+          studentService.getProgress(),
+        ]),
+      );
+
+      const fullStudent: Student = {
+        ...student,
+        courseProgress: progress.courseProgress ?? {},
+        coins: progress.coins ?? student.coins,
+        accessoriesOwned: progress.accessoriesOwned ?? student.accessoriesOwned,
+      };
+
+      await saveLocalSession(fullStudent);
+      set({ currentStudent: fullStudent, isAuthenticated: true });
+
+      // Best-effort secondary data — a failure here must not discard the
+      // fresh, correct core identity fetch already committed above.
+      let fetchedFresh = false;
+      try {
         await useShopStore.getState().fetchItems();
-        const fetchedFresh = await useCourseStore.getState().fetchCourses();
+      } catch (err) {
+        console.error("fetchItems failed during restoreSession:", err);
+      }
+      try {
+        fetchedFresh = await useCourseStore.getState().fetchCourses();
+      } catch (err) {
+        console.error("fetchCourses failed during restoreSession:", err);
+      }
+      try {
         await useCenterStore.getState().fetchCenters();
-        if (fetchedFresh) {
-          await syncCoursesToLocal(useCourseStore.getState().courses);
-        }
-
-        const fullStudent: Student = {
-          ...student,
-          courseProgress: progress.courseProgress ?? {},
-          coins: progress.coins ?? student.coins,
-          accessoriesOwned:
-            progress.accessoriesOwned ?? student.accessoriesOwned,
-        };
-
-        await saveLocalSession(fullStudent);
-        set({ currentStudent: fullStudent, isAuthenticated: true });
-        return { coursesFetched: true };
-      } else {
-        const localStudent = await loadLocalSession();
-        if (localStudent) {
-          set({ currentStudent: localStudent, isAuthenticated: true });
-          await useShopStore.getState().fetchItems();
-          await useCourseStore.getState().fetchCourses();
-          return { coursesFetched: true };
-        }
-        return { coursesFetched: false };
+      } catch (err) {
+        console.error("fetchCenters failed during restoreSession:", err);
       }
+      if (fetchedFresh) {
+        await syncCoursesToLocal(useCourseStore.getState().courses);
+      }
+
+      return { coursesFetched: true };
     } catch (err) {
-      if (!isOnline()) {
-        const localStudent = await loadLocalSession();
-        if (localStudent) {
-          set({ currentStudent: localStudent, isAuthenticated: true });
-        }
-        return { coursesFetched: false };
-      }
-
-      // Genuinely invalid/expired token — safe to fully log out.
       if (err instanceof ApiError && err.statusCode === 401) {
         await tokenStorage.clearAllTokens();
         await clearLocalSession();
@@ -127,27 +151,22 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         return { coursesFetched: false };
       }
 
-      const localStudent = await loadLocalSession();
-      if (localStudent) {
-        set({ currentStudent: localStudent, isAuthenticated: true });
-      }
-      return { coursesFetched: false };
+      return await restoreFromLocalCache();
     }
   },
 
   // ── Actions: login
   login: async (idNumber: string, password: string): Promise<boolean> => {
-    const online = await checkOnline();
-    if (!online) {
+    if (!isOnline()) {
       toast.error("No internet connection...");
       return false;
     }
-
     set({ isLoading: true });
-
     let student: Student;
     try {
-      student = await studentService.login(idNumber, password);
+      student = await withNetworkRetry(() =>
+        studentService.login(idNumber, password),
+      );
     } catch (err: any) {
       toast.error(err.message ?? "Login failed.");
       set({ isLoading: false });
@@ -244,6 +263,11 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
           mustChangePassword: false,
         };
         set({ currentStudent: updatedStudent });
+        // Persist immediately — restoreSession() falls back to this cached
+        // snapshot on any non-401 error (not just genuine offline states),
+        // so without this a refresh right after a forced password change
+        // could rehydrate mustChangePassword: true from a stale cache and
+        // bounce the student straight back to the change-password page.
         await saveLocalSession(updatedStudent);
       }
       return true;

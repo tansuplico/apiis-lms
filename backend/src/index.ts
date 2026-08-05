@@ -90,7 +90,11 @@ app.use(
   }),
 );
 
-app.use(morgan(isDev ? "dev" : "combined"));
+app.use(
+  morgan(isDev ? "dev" : "combined", {
+    skip: (req) => req.path === "/health",
+  }),
+);
 
 // ── Rate limiters
 

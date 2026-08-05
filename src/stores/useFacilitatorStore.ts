@@ -11,6 +11,8 @@ import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
+import { isOnline } from "@/services/networkStatus";
+import { withNetworkRetry } from "@/services/networkRetryService";
 
 interface FacilitatorStore {
   currentFacilitator: Facilitator | null;
@@ -46,13 +48,20 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         return;
       }
 
-      await useShopStore.getState().fetchItems();
+      if (!isOnline()) return;
 
-      const facilitator = await facilitatorService.getById(payload.id);
+      const facilitator = await withNetworkRetry(() =>
+        facilitatorService.getById(payload.id),
+      );
       set({ currentFacilitator: facilitator, isAuthenticated: true });
+
+      try {
+        await useShopStore.getState().fetchItems();
+      } catch (err) {
+        console.error("fetchItems failed during restoreSession:", err);
+      }
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
-        // Genuinely invalid/expired token — safe to log out.
         await tokenStorage.clearAllTokens();
         set({ currentFacilitator: null, isAuthenticated: false });
       }
@@ -61,10 +70,15 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
 
   // ── Actions: login
   login: async (email: string, password: string): Promise<void> => {
+    if (!isOnline()) {
+      throw new ApiError(0, "No internet connection.");
+    }
+
     set({ isLoading: true });
     try {
-      const facilitator = await facilitatorService.login(email, password);
-
+      const facilitator = await withNetworkRetry(() =>
+        facilitatorService.login(email, password),
+      );
       if (!facilitator.mustChangePassword) {
         await useShopStore.getState().fetchItems();
         await useCenterStore.getState().fetchCenters();
@@ -72,7 +86,6 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         await useStudentListStore.getState().fetchStudents();
         await useQuizBankCollectionStore.getState().fetchCollections();
       }
-
       set({ currentFacilitator: facilitator, isAuthenticated: true });
     } finally {
       set({ isLoading: false });

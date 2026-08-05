@@ -13,6 +13,8 @@ import { navigateTo } from "@/services/navigationService";
 import { ApiError } from "@/services/apiClient";
 import { useTicketStore } from "./useTicketStore";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
+import { isOnline } from "@/services/networkStatus";
+import { withNetworkRetry } from "@/services/networkRetryService";
 
 interface AdminStore {
   currentAdmin: Admin | null;
@@ -47,13 +49,20 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
         return;
       }
 
-      await useShopStore.getState().fetchItems();
+      if (!isOnline()) return;
 
-      const admin = await adminService.getById(payload.id);
+      const admin = await withNetworkRetry(() =>
+        adminService.getById(payload.id),
+      );
       set({ currentAdmin: admin, isAuthenticated: true });
+
+      try {
+        await useShopStore.getState().fetchItems();
+      } catch (err) {
+        console.error("fetchItems failed during restoreSession:", err);
+      }
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
-        // Genuinely invalid/expired token — safe to log out.
         await tokenStorage.clearAllTokens();
         set({ currentAdmin: null, isAuthenticated: false });
       }
@@ -62,10 +71,15 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
 
   // ── Actions: login
   login: async (email: string, password: string): Promise<void> => {
+    if (!isOnline()) {
+      throw new ApiError(0, "No internet connection.");
+    }
+
     set({ isLoading: true });
     try {
-      const admin = await adminService.login(email, password);
-
+      const admin = await withNetworkRetry(() =>
+        adminService.login(email, password),
+      );
       await useShopStore.getState().fetchItems();
       await useCenterStore.getState().fetchCenters();
       await useCourseStore.getState().fetchCourses();

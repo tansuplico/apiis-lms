@@ -69,6 +69,7 @@ import PublicRoute from "./components/shared/PublicRoute";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
+import { checkOnline, startNetworkPolling } from "./services/networkStatus";
 
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
@@ -111,6 +112,9 @@ export default function App() {
   // ── Effects: initialize app data
   useEffect(() => {
     const init = async () => {
+      startNetworkPolling();
+      await checkOnline();
+
       // Group 1: restore all sessions in parallel
       const [, , studentRestoreResult] = await Promise.all([
         restoreAdminSession(),
