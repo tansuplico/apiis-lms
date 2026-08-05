@@ -14,7 +14,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import CreateFacilitatorModal from "@/components/admins/facilitators/CreateFacilitatorModal";
-import TempPasswordModal from "@/components/admins/facilitators/TempPasswordModal";
+import TempPasswordModal from "@/components/shared/TempPasswordModal";
 import EditFacilitatorModal from "@/components/admins/facilitators/EditFacilitatorModal";
 import FacilitatorTableSkeleton from "@/components/ui/FacilitatorSkeleton";
 import { Facilitator } from "@/types/types";
@@ -170,7 +170,7 @@ export default function AdminFacilitators() {
 
   // ── Render
   return (
-    <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="space-y-10 pb-12  text-gray-900 dark:text-gray-100">
       {/* Header */}
       <h3 className="text-4xl text-gray-900 dark:text-white">Facilitators</h3>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

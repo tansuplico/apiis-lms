@@ -1,15 +1,19 @@
 // src/components/shared/CenterGradebookOverview.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   WifiOff,
   BookOpen,
+  ChevronUp,
+  ArrowUpDown,
+  Filter,
 } from "lucide-react";
 import { Course, CenterGradebookState } from "@/types/types";
 import { studentService } from "@/services/studentService";
 import { isOnline } from "@/services/networkStatus";
+import FilterDropdown from "./FilterDropdown";
 
 interface CenterGradebookOverviewProps {
   centerId: number;
@@ -31,6 +35,15 @@ export default function CenterGradebookOverview({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modulePage, setModulePage] = useState(0);
+  const [scoreDisplay, setScoreDisplay] = useState<"percent" | "raw">(
+    "percent",
+  );
+  type SortKey = "overall" | number;
+  const [sortBy, setSortBy] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed">(
+    "all",
+  );
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
@@ -90,6 +103,57 @@ export default function CenterGradebookOverview({
       .map((m) => m.moduleNumber),
   );
 
+  // ── Handlers: sorting
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDirection("desc"); // highest score first on first click
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortBy !== column)
+      return <ArrowUpDown size={14} className="opacity-40" />;
+    return sortDirection === "asc" ? (
+      <ChevronUp size={14} />
+    ) : (
+      <ChevronDown size={14} />
+    );
+  };
+
+  // ── Derived: students after status filter + column sort
+  const displayedStudents = useMemo(() => {
+    if (!gradebook) return [];
+    let result = gradebook.students;
+
+    if (statusFilter !== "all") {
+      result = result.filter((s) =>
+        statusFilter === "passed" ? s.overallPassed : !s.overallPassed,
+      );
+    }
+
+    if (sortBy) {
+      const scoreOf = (s: (typeof result)[number]) =>
+        sortBy === "overall"
+          ? s.overallScore
+          : (s.modules.find((m) => m.moduleNumber === sortBy)?.score ?? null);
+
+      result = [...result].sort((a, b) => {
+        const aScore = scoreOf(a);
+        const bScore = scoreOf(b);
+        if (aScore === null && bScore === null) return 0;
+        if (aScore === null) return 1; // no attempt always sinks to the bottom
+        if (bScore === null) return -1;
+        const cmp = aScore - bScore;
+        return sortDirection === "asc" ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [gradebook, statusFilter, sortBy, sortDirection]);
+
   // ── Guard: no courses assigned to this center
   if (courses.length === 0) {
     return (
@@ -108,42 +172,94 @@ export default function CenterGradebookOverview({
           Gradebook
         </h2>
 
-        <div className="relative">
-          <button
-            onClick={() => setIsCourseDropdownOpen((open) => !open)}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 min-w-55"
-          >
-            <BookOpen
-              size={16}
-              className="text-gray-500 dark:text-gray-400 shrink-0"
-            />
-            <span className="flex-1 text-left truncate">
-              {selectedCourse?.title ?? "Select a course"}
-            </span>
-            <ChevronDown
-              size={16}
-              className={`text-gray-500 dark:text-gray-400 shrink-0 transition-transform ${
-                isCourseDropdownOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {isCourseDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-full min-w-55 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 py-1 max-h-72 overflow-y-auto">
-              {courses.map((course) => (
+        <div className="flex items-center justify-between gap-5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
-                  key={course.id}
-                  onClick={() => {
-                    setSelectedCourseId(course.id);
-                    setIsCourseDropdownOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 truncate"
+                  onClick={() => setScoreDisplay("percent")}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    scoreDisplay === "percent"
+                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
                 >
-                  {course.title}
+                  Percentage
                 </button>
-              ))}
+                <button
+                  onClick={() => setScoreDisplay("raw")}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    scoreDisplay === "raw"
+                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  Raw Score
+                </button>
+              </div>
             </div>
-          )}
+
+            <FilterDropdown
+              value={statusFilter}
+              onChange={(v) =>
+                setStatusFilter(v as "all" | "passed" | "failed")
+              }
+              options={[
+                { value: "all", label: "All Statuses" },
+                { value: "passed", label: "Passed" },
+                { value: "failed", label: "Failed" },
+              ]}
+              icon={
+                <Filter
+                  size={14}
+                  className={
+                    statusFilter !== "all"
+                      ? "text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }
+                />
+              }
+              active={statusFilter !== "all"}
+            />
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsCourseDropdownOpen((open) => !open)}
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 min-w-55"
+            >
+              <BookOpen
+                size={16}
+                className="text-gray-500 dark:text-gray-400 shrink-0"
+              />
+              <span className="flex-1 text-left truncate">
+                {selectedCourse?.title ?? "Select a course"}
+              </span>
+              <ChevronDown
+                size={16}
+                className={`text-gray-500 dark:text-gray-400 shrink-0 transition-transform ${
+                  isCourseDropdownOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {isCourseDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-full min-w-55 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 py-1 max-h-72 overflow-y-auto">
+                {courses.map((course) => (
+                  <button
+                    key={course.id}
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      setIsCourseDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 truncate"
+                  >
+                    {course.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -244,11 +360,23 @@ export default function CenterGradebookOverview({
                         }`}
                         className="px-2 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-14"
                       >
-                        Q{mod.moduleNumber}
+                        <button
+                          onClick={() => handleSort(mod.moduleNumber)}
+                          className="flex items-center justify-center gap-1 mx-auto hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                        >
+                          Q{mod.moduleNumber}
+                          <SortIcon column={mod.moduleNumber} />
+                        </button>
                       </th>
                     ))}
                   <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-28 sticky right-28 z-10 bg-gray-50 dark:bg-gray-700/50 border-l border-gray-200 dark:border-gray-700">
-                    Overall
+                    <button
+                      onClick={() => handleSort("overall")}
+                      className="flex items-center justify-center gap-1 mx-auto hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                    >
+                      Overall
+                      <SortIcon column="overall" />
+                    </button>
                   </th>
                   <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-28 sticky right-0 z-10 bg-gray-50 dark:bg-gray-700/50">
                     Status
@@ -256,64 +384,79 @@ export default function CenterGradebookOverview({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
-                {gradebook.students.map((student) => (
-                  <tr
-                    key={student.studentId}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors"
-                  >
-                    <td className="px-6 py-4 sticky left-0 z-10 bg-white dark:bg-gray-800">
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">
-                        {student.firstName} {student.lastName}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                        {student.idNumber}
-                      </p>
-                    </td>
-
-                    {student.modules
-                      .filter((mod) => pagedModuleNumbers.has(mod.moduleNumber))
-                      .map((mod) => (
-                        <td
-                          key={mod.moduleNumber}
-                          className="px-2 py-4 text-center w-14"
-                        >
-                          {!mod.hasQuiz ? (
-                            <span className="text-sm text-gray-400">—</span>
-                          ) : mod.attempted ? (
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">
-                              {mod.score}%
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400">X</span>
-                          )}
-                        </td>
-                      ))}
-
-                    <td className="px-4 py-4 text-center w-28 sticky right-28 z-10 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
-                      <span
-                        className={`font-semibold text-sm ${
-                          student.overallPassed
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-red-600 dark:text-red-400"
-                        }`}
-                      >
-                        {student.overallScore}%
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-center w-28 sticky right-0 z-10 bg-white dark:bg-gray-800">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                          student.overallPassed
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        }`}
-                      >
-                        {student.overallPassed ? "Passed" : "Failed"}
-                      </span>
+                {displayedStudents.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={pagedModuleNumbers.size + 3}
+                      className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      No students match the selected filter.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  displayedStudents.map((student) => (
+                    <tr
+                      key={student.studentId}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors"
+                    >
+                      <td className="px-6 py-4 sticky left-0 z-10 bg-white dark:bg-gray-800">
+                        <p className="font-medium text-gray-900 dark:text-white text-sm">
+                          {student.firstName} {student.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                          {student.idNumber}
+                        </p>
+                      </td>
+
+                      {student.modules
+                        .filter((mod) =>
+                          pagedModuleNumbers.has(mod.moduleNumber),
+                        )
+                        .map((mod) => (
+                          <td
+                            key={mod.moduleNumber}
+                            className="px-2 py-4 text-center w-14"
+                          >
+                            {!mod.hasQuiz ? (
+                              <span className="text-sm text-gray-400">—</span>
+                            ) : mod.attempted ? (
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                {scoreDisplay === "raw"
+                                  ? `${mod.correctAnswers}/${mod.totalQuestions}`
+                                  : `${mod.score}%`}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-400">X</span>
+                            )}
+                          </td>
+                        ))}
+
+                      <td className="px-4 py-4 text-center w-28 sticky right-28 z-10 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
+                        <span
+                          className={`font-semibold text-sm ${
+                            student.overallPassed
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {student.overallScore}%
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4 text-center w-28 sticky right-0 z-10 bg-white dark:bg-gray-800">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                            student.overallPassed
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          }`}
+                        >
+                          {student.overallPassed ? "Passed" : "Failed"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

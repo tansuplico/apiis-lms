@@ -61,7 +61,7 @@ export default function Courses() {
 
   // ── Render
   return (
-    <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 transition-colors duration-300 pb-10">
+    <div className="min-h-screen text-gray-900 dark:text-gray-100 transition-colors duration-300 pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <h3 className="text-4xl text-gray-900 dark:text-white">Courses</h3>

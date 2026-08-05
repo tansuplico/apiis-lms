@@ -76,7 +76,7 @@ export default function CoursePreview() {
 
   // ── Render
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className="min-h-screen text-gray-900 dark:text-gray-100 transition-colors duration-300">
       {/* Hero Banner */}
       <div className="relative border-b border-gray-200 dark:border-gray-800 dark:bg-[#111827] overflow-hidden">
         <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-20 py-8">

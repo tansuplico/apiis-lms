@@ -97,7 +97,7 @@ export default function Courses() {
 
   // ── Render
   return (
-    <div className="bg-white dark:bg-gray-950  text-gray-900 dark:text-gray-100 pb-10">
+    <div className="  text-gray-900 dark:text-gray-100 pb-10">
       {/* Header */}
       <h3 className="text-4xl text-gray-900 dark:text-white">Courses</h3>
 

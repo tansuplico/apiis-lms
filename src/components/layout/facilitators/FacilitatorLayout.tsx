@@ -11,6 +11,7 @@ import {
   startNetworkPolling,
 } from "@/services/networkStatus";
 import UpdateNotifier from "@/components/shared/UpdateNotifier";
+import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
 
 export default function FacilitatorLayout() {
   // ── Store
@@ -52,10 +53,9 @@ export default function FacilitatorLayout() {
   return (
     <>
       <UpdateNotifier />
-
-      <div className="flex min-h-screen bg-white dark:bg-gray-950">
+      <BackgroundDecorationAlt />
+      <div className="flex min-h-screen">
         <FacilitatorSidebar />
-
         <div className="flex-1 ml-64">
           <header className="fixed top-0 left-64 right-0 z-20 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center duration-300">
             <div className="flex items-center gap-4">
@@ -110,7 +110,7 @@ export default function FacilitatorLayout() {
             </div>
           </header>
 
-          <main className="pt-30 px-10 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 duration-300">
+          <main className="pt-30 px-10 text-gray-900 dark:text-gray-100">
             <Outlet />
           </main>
 

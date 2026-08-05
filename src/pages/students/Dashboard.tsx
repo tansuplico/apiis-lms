@@ -84,7 +84,7 @@ export default function Dashboard() {
 
   // ── Render
   return (
-    <div className="space-y-10 pb-10 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="space-y-10 pb-10 text-gray-900 dark:text-gray-100">
       {/* Hero Greeting */}
       <div
         className="relative rounded-3xl overflow-hidden "

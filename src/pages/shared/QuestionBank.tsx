@@ -446,7 +446,7 @@ export default function QuestionBank() {
 
   if (!activeCollection) {
     return (
-      <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+      <div className="space-y-10 pb-12 text-gray-900 dark:text-gray-100">
         <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
           Question Bank
         </h1>

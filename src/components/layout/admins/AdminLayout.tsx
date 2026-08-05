@@ -11,6 +11,7 @@ import {
   startNetworkPolling,
 } from "@/services/networkStatus";
 import UpdateNotifier from "@/components/shared/UpdateNotifier";
+import BackgroundDecoration from "@/components/ui/BackgroundDecoration";
 
 export default function AdminLayout() {
   // ── Store
@@ -54,7 +55,8 @@ export default function AdminLayout() {
   return (
     <>
       <UpdateNotifier />
-      <div className="flex min-h-screen bg-white dark:bg-gray-950">
+      <BackgroundDecoration />
+      <div className="flex min-h-screen">
         <AdminSidebar />
 
         <div className="flex-1 ml-64">
@@ -111,7 +113,7 @@ export default function AdminLayout() {
             </div>
           </header>
 
-          <main className="pt-30 px-10 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+          <main className="pt-30 px-10 text-gray-900 dark:text-gray-100">
             <Outlet />
           </main>
 

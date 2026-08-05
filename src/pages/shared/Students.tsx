@@ -28,6 +28,7 @@ import ResetPasswordConfirmModal from "@/components/admins/students/ResetPasswor
 import EditStudentModal from "@/components/admins/students/EditStudentModal";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
+import TempPasswordModal from "@/components/shared/TempPasswordModal";
 import StudentTableSkeleton from "@/components/ui/StudentSkeleton";
 import StudentAvatar from "@/components/shared/StudentAvatar";
 import FilterDropdown from "@/components/shared/FilterDropdown";
@@ -310,7 +311,7 @@ export default function Students() {
 
   // ── Render
   return (
-    <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="space-y-10 pb-12 text-gray-900 dark:text-gray-100">
       {/* Header */}
       <h3 className="text-4xl text-gray-900 dark:text-white"> Students </h3>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -664,33 +665,27 @@ export default function Students() {
       )}
 
       {resetPasswordData && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Password Reset</h3>
-            <p className="mb-2">
-              New password for {resetPasswordData.student.firstName}{" "}
-              {resetPasswordData.student.lastName}:
-            </p>
-            <p className="text-2xl font-mono text-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg mb-4">
-              {resetPasswordData.newPassword}
-            </p>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(resetPasswordData.newPassword);
-                toast.success("Copied to clipboard!");
-              }}
-              className="w-full mb-2 bg-blue-600 text-white py-2 rounded-lg"
-            >
-              Copy Password
-            </button>
-            <button
-              onClick={() => setResetPasswordData(null)}
-              className="w-full bg-gray-200 py-2 rounded-lg"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <TempPasswordModal
+          tempPassword={resetPasswordData.newPassword}
+          title="Password Reset"
+          description={
+            <>
+              Share this new password with{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {resetPasswordData.student.firstName}{" "}
+                {resetPasswordData.student.lastName}
+              </span>
+              . It will{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                not be shown again
+              </span>{" "}
+              — copy it now before closing.
+            </>
+          }
+          noteText="The student will be required to set a new password on their next login."
+          buttonLabel="Password Saved"
+          onClose={() => setResetPasswordData(null)}
+        />
       )}
 
       {studentForHistory && (

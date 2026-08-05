@@ -181,7 +181,7 @@ export default function CoursePreview() {
 
   // ── Render
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="min-h-screen text-gray-900 dark:text-gray-100">
       <div>
         {!course ? (
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -192,7 +192,7 @@ export default function CoursePreview() {
         ) : (
           <>
             {/* Top bar: edit/save or edit/delete actions */}
-            <div className="sticky top-0 z-10 bg-white dark:bg-gray-950 px-6 py-4 flex items-center justify-end">
+            <div className="sticky top-0 z-10  px-6 py-4 flex items-center justify-end">
               <div className="flex items-center gap-4">
                 {isEditing ? (
                   <>
@@ -463,7 +463,7 @@ export default function CoursePreview() {
             </div>
 
             {/* Tabs */}
-            <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <div className=" border-b border-gray-200 dark:border-gray-800">
               <div className="max-w-7xl mx-auto px-6">
                 <div className="flex overflow-x-auto scrollbar-hide space-x-3 py-3">
                   {tabs.map((tab) => (

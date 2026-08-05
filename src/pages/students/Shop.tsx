@@ -93,7 +93,7 @@ export default function Shop() {
 
   // ── Render
   return (
-    <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 pb-10">
+    <div className="min-h-screen text-gray-900 dark:text-gray-100 pb-10">
       {/* Hero Banner */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-[#80BC04] dark:bg-[#5e8f03] text-white p-8 md:p-12 rounded-2xl overflow-hidden shadow-lg">
         <div className="max-w-lg">

@@ -70,7 +70,7 @@ export default function AdminDashboard() {
 
   // ── Render
   return (
-    <div className="space-y-10 pb-12 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="space-y-10 pb-12  text-gray-900 dark:text-gray-100">
       {/* Hero Banner */}
       <div
         className={`relative rounded-3xl overflow-hidden bg-linear-to-r ${heroGradient}`}

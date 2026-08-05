@@ -1,5 +1,5 @@
 // src/components/admins/students/ResetPasswordConfirmModal.tsx
-import { RefreshCw, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Student } from "@/types/types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
@@ -19,62 +19,58 @@ export default function ResetPasswordConfirmModal({
   // ── Store
   const online = useOnlineStatus();
 
+  const initials =
+    `${student.firstName[0] ?? ""}${student.lastName[0] ?? ""}`.toUpperCase();
+
   // ── Render
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-xl w-full shadow-2xl border border-gray-200 dark:border-gray-700 transform transition-all">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
-            <RefreshCw
-              size={24}
-              className="text-yellow-600 dark:text-yellow-400"
-            />
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="h-1.5 bg-blue-600" />
+
+        <div className="p-7">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">
+              {initials}
+            </div>
+            <div>
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                Reset password
+              </p>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                {student.firstName} {student.lastName}
+              </h3>
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Reset Password?
-          </h3>
-        </div>
 
-        <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-          This will generate a{" "}
-          <span className="font-semibold">new temporary password</span> for{" "}
-          <span className="font-semibold text-gray-900 dark:text-white">
-            {student.firstName} {student.lastName}
-          </span>
-          . The student will be required to change it on their next login.
-        </p>
-
-        <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <p className="text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
-            <span className="text-base">⚠️</span>
-            The old password will no longer work after reset.
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+            A new temporary password will be generated. The current one stops
+            working immediately, and {student.firstName} will need to set a new
+            password on their next login.
           </p>
-        </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={onConfirm}
-            disabled={isResetting || !online}
-            className="flex-1 bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800 disabled:bg-yellow-400 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-2"
-          >
-            {isResetting ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={16} />
-                Generate New Password
-              </>
-            )}
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-200 font-medium py-2.5 px-4 rounded-xl transition-all duration-200"
-          >
-            Cancel
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onConfirm}
+              disabled={isResetting || !online}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isResetting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate Password"
+              )}
+            </button>
+            <button
+              onClick={onCancel}
+              className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-4 py-2.5 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

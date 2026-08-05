@@ -69,7 +69,7 @@ import PublicRoute from "./components/shared/PublicRoute";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
-import { checkOnline, startNetworkPolling } from "./services/networkStatus";
+import { ThemeProvider } from "./hooks/useTheme";
 
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
@@ -112,9 +112,6 @@ export default function App() {
   // ── Effects: initialize app data
   useEffect(() => {
     const init = async () => {
-      startNetworkPolling();
-      await checkOnline();
-
       // Group 1: restore all sessions in parallel
       const [, , studentRestoreResult] = await Promise.all([
         restoreAdminSession(),
@@ -158,168 +155,175 @@ export default function App() {
 
   // ── Render: application routes
   return (
-    <BrowserRouter>
-      <NavigationRegistrar />
-      <ScrollToTop />
-      {!isInitialized ? (
-        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600" />
-        </div>
-      ) : (
-        <ErrorBoundary>
-          <Routes>
-            {/* Public routes */}
-            <Route
-              path="/"
-              element={
-                <PublicRoute>
-                  <Navigate to="/student/login" replace />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Navigate to="/student/login" replace />
-                </PublicRoute>
-              }
-            />
-
-            {/* Authentication pages */}
-            <Route
-              path="/student/login"
-              element={
-                <PublicRoute>
-                  <StudentLogin />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/facilitator-admin/login"
-              element={
-                <PublicRoute>
-                  <FaciAdminLogin />
-                </PublicRoute>
-              }
-            />
-            <Route path="/change-password" element={<ChangePassword />} />
-            <Route
-              path="/facilitator/change-password"
-              element={<FacilitatorChangePassword />}
-            />
-
-            {/* Student routes */}
-            <Route
-              path="/student"
-              element={
-                <ProtectedRoute role="student">
-                  <StudentLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="shop" element={<Shop />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="courses" element={<Courses />} />
+    <ThemeProvider>
+      <BrowserRouter>
+        <NavigationRegistrar />
+        <ScrollToTop />
+        {!isInitialized ? (
+          <div className="min-h-screen flex items-center justify-center bg-white/70 dark:bg-gray-950/70 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl px-11 py-8 flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-600 border-t-blue-600" />
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                Refetching...
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ErrorBoundary>
+            <Routes>
+              {/* Public routes */}
               <Route
-                path="courses/:courseName/course-preview"
-                element={<CoursePreview />}
+                path="/"
+                element={
+                  <PublicRoute>
+                    <Navigate to="/student/login" replace />
+                  </PublicRoute>
+                }
               />
               <Route
-                path="course/:courseId/:moduleNumber/*"
-                element={<EnrolledCourseLayout />}
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Navigate to="/student/login" replace />
+                  </PublicRoute>
+                }
+              />
+
+              {/* Authentication pages */}
+              <Route
+                path="/student/login"
+                element={
+                  <PublicRoute>
+                    <StudentLogin />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/facilitator-admin/login"
+                element={
+                  <PublicRoute>
+                    <FaciAdminLogin />
+                  </PublicRoute>
+                }
+              />
+              <Route path="/change-password" element={<ChangePassword />} />
+              <Route
+                path="/facilitator/change-password"
+                element={<FacilitatorChangePassword />}
+              />
+
+              {/* Student routes */}
+              <Route
+                path="/student"
+                element={
+                  <ProtectedRoute role="student">
+                    <StudentLayout />
+                  </ProtectedRoute>
+                }
               >
-                <Route index element={<CourseModulePart />} />
-                <Route path="*" element={<CourseModulePart />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="shop" element={<Shop />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="courses" element={<Courses />} />
+                <Route
+                  path="courses/:courseName/course-preview"
+                  element={<CoursePreview />}
+                />
+                <Route
+                  path="course/:courseId/:moduleNumber/*"
+                  element={<EnrolledCourseLayout />}
+                >
+                  <Route index element={<CourseModulePart />} />
+                  <Route path="*" element={<CourseModulePart />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* Facilitator routes */}
-            <Route
-              path="/facilitator"
-              element={
-                <ProtectedRoute role="facilitator">
-                  <FacilitatorLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="dashboard" element={<FacilitatorDashboard />} />
-              <Route path="profile" element={<FacilitatorProfile />} />
-              <Route path="students" element={<FacilitatorStudents />} />
-              <Route path="question-bank" element={<QuestionBank />} />
-              <Route path="attendance" element={<FacilitatorAttendance />} />
+              {/* Facilitator routes */}
               <Route
-                path="attendance/:attendanceId"
-                element={<FacilitatorAttendanceDetail />}
-              />
-              <Route path="centers" element={<FacilitatorCenters />} />
-              <Route
-                path="centers/:centerId/view"
-                element={<FacilitatorViewCenter />}
-              />
-              <Route path="courses" element={<FacilitatorCourses />} />
-              <Route
-                path="courses/:courseName/course-preview"
-                element={<FacilitatorCoursePreview />}
-              />
-              <Route
-                path="course/:courseSlug/:moduleNumber/*"
-                element={<FacilitatorCourseLayout />}
+                path="/facilitator"
+                element={
+                  <ProtectedRoute role="facilitator">
+                    <FacilitatorLayout />
+                  </ProtectedRoute>
+                }
               >
-                <Route index element={<AdminCourseModulePart />} />
-                <Route path="*" element={<AdminCourseModulePart />} />
+                <Route path="dashboard" element={<FacilitatorDashboard />} />
+                <Route path="profile" element={<FacilitatorProfile />} />
+                <Route path="students" element={<FacilitatorStudents />} />
+                <Route path="question-bank" element={<QuestionBank />} />
+                <Route path="attendance" element={<FacilitatorAttendance />} />
+                <Route
+                  path="attendance/:attendanceId"
+                  element={<FacilitatorAttendanceDetail />}
+                />
+                <Route path="centers" element={<FacilitatorCenters />} />
+                <Route
+                  path="centers/:centerId/view"
+                  element={<FacilitatorViewCenter />}
+                />
+                <Route path="courses" element={<FacilitatorCourses />} />
+                <Route
+                  path="courses/:courseName/course-preview"
+                  element={<FacilitatorCoursePreview />}
+                />
+                <Route
+                  path="course/:courseSlug/:moduleNumber/*"
+                  element={<FacilitatorCourseLayout />}
+                >
+                  <Route index element={<AdminCourseModulePart />} />
+                  <Route path="*" element={<AdminCourseModulePart />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* Admin routes */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="centers" element={<AdminCenters />} />
+              {/* Admin routes */}
               <Route
-                path="centers/:centerId/view"
-                element={<AdminViewCenter />}
-              />
-              <Route path="students" element={<AdminStudents />} />
-              <Route path="facilitators" element={<AdminFacilitators />} />
-              <Route path="tickets" element={<AdminTickets />} />
-              <Route path="profile" element={<AdminProfile />} />
-              <Route path="attendance" element={<AdminAttendance />} />
-              <Route path="shop" element={<AdminShop />} />
-              <Route path="question-bank" element={<QuestionBank />} />
-              <Route
-                path="attendance/:attendanceId"
-                element={<AdminAttendanceDetail />}
-              />
-              <Route path="courses" element={<AdminCourses />} />
-              <Route
-                path="courses/:courseName/course-preview"
-                element={<AdminCoursePreview />}
-              />
-              <Route
-                path="course/:courseSlug/:moduleNumber/*"
-                element={<AdminCourseLayout />}
+                path="/admin"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
               >
-                <Route index element={<AdminCourseModulePart />} />
-                <Route path="*" element={<AdminCourseModulePart />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="centers" element={<AdminCenters />} />
+                <Route
+                  path="centers/:centerId/view"
+                  element={<AdminViewCenter />}
+                />
+                <Route path="students" element={<AdminStudents />} />
+                <Route path="facilitators" element={<AdminFacilitators />} />
+                <Route path="tickets" element={<AdminTickets />} />
+                <Route path="profile" element={<AdminProfile />} />
+                <Route path="attendance" element={<AdminAttendance />} />
+                <Route path="shop" element={<AdminShop />} />
+                <Route path="question-bank" element={<QuestionBank />} />
+                <Route
+                  path="attendance/:attendanceId"
+                  element={<AdminAttendanceDetail />}
+                />
+                <Route path="courses" element={<AdminCourses />} />
+                <Route
+                  path="courses/:courseName/course-preview"
+                  element={<AdminCoursePreview />}
+                />
+                <Route
+                  path="course/:courseSlug/:moduleNumber/*"
+                  element={<AdminCourseLayout />}
+                >
+                  <Route index element={<AdminCourseModulePart />} />
+                  <Route path="*" element={<AdminCourseModulePart />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* Catch-all redirect */}
-            <Route
-              path="*"
-              element={<Navigate to="/student/login" replace />}
-            />
-          </Routes>
-        </ErrorBoundary>
-      )}
-    </BrowserRouter>
+              {/* Catch-all redirect */}
+              <Route
+                path="*"
+                element={<Navigate to="/student/login" replace />}
+              />
+            </Routes>
+          </ErrorBoundary>
+        )}
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

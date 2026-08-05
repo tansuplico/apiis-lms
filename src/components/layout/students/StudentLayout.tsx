@@ -13,6 +13,7 @@ import {
 import { getLastSyncTime } from "@/services/syncService";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import UpdateNotifier from "@/components/shared/UpdateNotifier";
+import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
 
 export default function StudentLayout() {
   // ── Hooks & Store
@@ -73,7 +74,8 @@ export default function StudentLayout() {
   return (
     <>
       <UpdateNotifier />
-      <div className="flex min-h-screen bg-white dark:bg-gray-950">
+      <BackgroundDecorationAlt />
+      <div className="flex min-h-screen">
         <StudentSidebar />
         <div className="flex-1 ml-64">
           <header className="fixed top-0 left-64 right-0 z-20 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-5">
@@ -156,7 +158,7 @@ export default function StudentLayout() {
             </div>
           </header>
 
-          <main className="pt-24 px-8">
+          <main className="pt-30 px-10 text-gray-900 dark:text-gray-100">
             <Outlet />
           </main>
         </div>

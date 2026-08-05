@@ -70,7 +70,7 @@ export default function Centers() {
 
   // ── Render
   return (
-    <div className="bg-white dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100 pb-10">
+    <div className="min-h-screen text-gray-900 dark:text-gray-100 pb-10">
       {/* Header */}
       <h3 className="text-4xl text-gray-900 dark:text-white">Centers</h3>
 
