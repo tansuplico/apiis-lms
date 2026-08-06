@@ -20,20 +20,43 @@ export function resolveApiUrl(url: string): string {
   return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
 }
 
-export async function embedContentImages(html: string): Promise<string> {
-  if (!html || !html.includes("<img")) return html;
+export interface EmbedContentImagesResult {
+  html: string;
+  hadFailures: boolean;
+}
+
+export async function embedContentImages(
+  html: string,
+): Promise<EmbedContentImagesResult> {
+  if (!html || !html.includes("<img")) {
+    return { html, hadFailures: false };
+  }
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const images = Array.from(doc.querySelectorAll("img"));
+    let hadFailures = false;
     for (const img of images) {
       const src = img.getAttribute("src");
       if (!src || src.startsWith("data:")) continue;
-      const base64 = await toBase64(resolveApiUrl(src));
-      if (base64) img.setAttribute("src", base64);
+      try {
+        const base64 = await toBase64(resolveApiUrl(src));
+        if (base64) {
+          img.setAttribute("src", base64);
+        } else {
+          hadFailures = true;
+          console.error(
+            `embedContentImages: toBase64 returned empty for ${src}`,
+          );
+        }
+      } catch (imgErr) {
+        hadFailures = true;
+        console.error(`embedContentImages: failed to embed ${src}`, imgErr);
+      }
     }
-    return doc.body.innerHTML;
-  } catch {
-    return html;
+    return { html: doc.body.innerHTML, hadFailures };
+  } catch (err) {
+    console.error("embedContentImages: threw, returning original html", err);
+    return { html, hadFailures: true };
   }
 }
 

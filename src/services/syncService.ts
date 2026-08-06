@@ -89,16 +89,26 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
       );
 
       for (const part of module.parts ?? []) {
-        const localContent = part.content
-          ? await embedContentImages(part.content)
-          : null;
+        let localContent: string | null = part.content ?? null;
+        if (part.content) {
+          const { html, hadFailures } = await embedContentImages(part.content);
+          if (hadFailures) {
+            const existing = await db.select<{ content: string | null }[]>(
+              `SELECT content FROM local_parts WHERE id = $1`,
+              [part.id],
+            );
+            localContent = existing[0]?.content ?? html;
+          } else {
+            localContent = html;
+          }
+        }
 
         await db.execute(
           `INSERT INTO local_parts (id, module_id, course_id, slug, name, cover_color, content, order_num)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-     ON CONFLICT(id) DO UPDATE SET
-      name=excluded.name, cover_color=excluded.cover_color,
-      content=excluded.content, order_num=excluded.order_num`,
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          ON CONFLICT(id) DO UPDATE SET
+            name=excluded.name, cover_color=excluded.cover_color,
+            content=excluded.content, order_num=excluded.order_num`,
           [
             part.id,
             module.id,
