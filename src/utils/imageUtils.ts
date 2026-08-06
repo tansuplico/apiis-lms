@@ -1,6 +1,6 @@
 export async function toBase64(url: string): Promise<string> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return "";
     const blob = await res.blob();
     return new Promise((resolve) => {

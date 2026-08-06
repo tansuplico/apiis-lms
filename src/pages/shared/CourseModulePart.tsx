@@ -181,21 +181,24 @@ export default function CourseModulePart() {
     const formData = new FormData();
     formData.append("image", file);
 
-    fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
       method: "POST",
       headers,
       body: formData,
-    })
-      .then((res) => {
-        if (res.status === 401) handleUnauthorizedResponse(res.status);
-      })
-      .catch(() => {});
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read image file."));
-      reader.readAsDataURL(file);
     });
+
+    if (res.status === 401) {
+      handleUnauthorizedResponse(res.status);
+      throw new Error("Unauthorized.");
+    }
+
+    if (!res.ok) {
+      toast.error("Image upload failed. Please try again.");
+      throw new Error("Image upload failed.");
+    }
+
+    const json = await res.json();
+    return json.data.url as string;
   };
 
   // ── Render
