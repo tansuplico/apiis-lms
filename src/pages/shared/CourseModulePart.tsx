@@ -275,6 +275,7 @@ export default function CourseModulePart() {
                 />
               ) : (
                 <TipTapEditor
+                  key={currentPart.id}
                   content={editedContent}
                   onChange={handleEditorChange}
                   editable={true}

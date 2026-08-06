@@ -5,6 +5,7 @@ import { centerService } from "@/services/centerService";
 import { toast } from "react-toastify";
 import { toBase64 } from "@/utils/imageUtils";
 import { useFacilitatorListStore } from "./useFacilitatorListStore";
+import { isOnline } from "@/services/networkStatus";
 
 type AddStudentResult =
   | "success"
@@ -49,6 +50,7 @@ export const useCenterStore = create<CenterStore>()((set, get) => ({
 
   // ── Actions: fetch all centers
   fetchCenters: async () => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const centers = await centerService.getAll();

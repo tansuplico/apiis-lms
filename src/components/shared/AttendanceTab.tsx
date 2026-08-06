@@ -7,6 +7,7 @@ import { getLocalDateString } from "@/utils/dateformatter";
 import StudentAvatar from "./StudentAvatar";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import AttendanceOverview from "./AttendanceOverview";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface AttendanceTabProps {
   centerId: number;
@@ -24,7 +25,7 @@ export default function AttendanceTab({
   // ── Store
   const { saveAttendance, getAttendanceByCenter, records, isSubmitting } =
     useAttendanceStore();
-
+  const online = useOnlineStatus();
   // ── State: view mode + date selection
   const [viewMode, setViewMode] = useState<ViewMode>("take");
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
@@ -199,7 +200,7 @@ export default function AttendanceTab({
 
               <button
                 onClick={handleSave}
-                disabled={isSubmitting || isSundaySelected}
+                disabled={isSubmitting || isSundaySelected || !online}
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
                 <Save size={20} />

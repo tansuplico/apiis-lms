@@ -1,3 +1,5 @@
+import { isOnline } from "@/services/networkStatus";
+
 // src/utils/imageUtils.ts — replace toBase64() entirely
 export async function toBase64(url: string): Promise<string> {
   try {
@@ -29,12 +31,6 @@ export async function toBase64(url: string): Promise<string> {
 }
 
 // src/utils/imageUtils.ts — append at the end of the file
-
-// Downscales and re-encodes an image file to a WebP data URI so it can be
-// stored inline in course content. Inline storage is what makes content
-// images work offline: nothing is fetched at sync time, so there is no host
-// to resolve, no CORS boundary, and no dependency on server disk state.
-// Note: animated GIFs are flattened to a single frame by the canvas.
 export async function fileToCompressedDataUrl(
   file: File,
   maxDimension = 1000,
@@ -129,4 +125,8 @@ export function resolveThumbnailUrl(url: string | null | undefined): string {
   }
   if (url.startsWith("http")) return url;
   return "/module-thumbnail.png";
+}
+
+export function imageFallbackSrc(): string {
+  return isOnline() ? "/module-thumbnail.png" : "/no-internet.png";
 }

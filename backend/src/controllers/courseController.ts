@@ -1306,6 +1306,8 @@ export const updatePart = async (req: Request, res: Response) => {
         });
         return;
       }
+      updates.push(`content = $${paramCount++}`);
+      values.push(content);
     }
 
     if (updates.length === 0) {
@@ -1625,6 +1627,31 @@ export const reorderPart = async (req: Request, res: Response) => {
       .json({ success: true, message: "Part reordered successfully." });
   } catch (err) {
     console.error("reorderPart error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// backend/src/controllers/courseController.ts — add near getCourse
+export const getCourseVersions = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (isNaN(Number(id))) {
+      res.status(400).json({ success: false, message: "Invalid ID." });
+      return;
+    }
+    const result = await pool.query(
+      `SELECT p.id, p.updated_at
+       FROM course_parts p
+       INNER JOIN course_modules m ON m.id = p.module_id
+       WHERE m.course_id = $1`,
+      [id],
+    );
+    res.status(200).json({
+      success: true,
+      data: result.rows.map((r) => ({ id: r.id, updatedAt: r.updated_at })),
+    });
+  } catch (err) {
+    console.error("getCourseVersions error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };

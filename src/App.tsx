@@ -19,7 +19,7 @@ import { useStudentListStore } from "./stores/useStudentListStore";
 import { useFacilitatorListStore } from "./stores/useFacilitatorListStore";
 import { useFacilitatorStore } from "./stores/useFacilitatorStore";
 import { useTicketStore } from "./stores/useTicketStore";
-
+import { primeNetworkStatus } from "./services/networkStatus";
 import StudentLogin from "@/pages/auth/StudentLogin";
 import FaciAdminLogin from "@/pages/auth/FaciAdminLogin";
 
@@ -113,6 +113,7 @@ export default function App() {
   // ── Effects: initialize app data
   useEffect(() => {
     const init = async () => {
+      await primeNetworkStatus();
       // Group 1: restore all sessions in parallel
       const [, , studentRestoreResult] = await Promise.all([
         restoreAdminSession(),

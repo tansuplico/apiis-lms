@@ -34,6 +34,7 @@ import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import FilterDropdown from "@/components/shared/FilterDropdown";
 import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
 import { useSearchParams } from "react-router-dom";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
@@ -103,6 +104,7 @@ export default function QuestionBank() {
     isLoading: collectionsLoading,
     fetchCollections,
   } = useQuizBankCollectionStore();
+  const online = useOnlineStatus();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCollectionId = searchParams.get("collection");
@@ -499,7 +501,8 @@ export default function QuestionBank() {
               </div>
               <button
                 onClick={startCreateCollection}
-                className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+                disabled={!online}
+                className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus size={20} />
                 New Collection

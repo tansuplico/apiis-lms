@@ -49,6 +49,8 @@ export default function FacilitatorCourseLayout() {
     deleteVideo: storeDeleteVideo,
     uploadFile: storeUploadFile,
     deleteFile: storeDeleteFile,
+    refreshCourse,
+    hasStalePartVersions,
   } = useCourseStore();
 
   const {
@@ -123,6 +125,8 @@ export default function FacilitatorCourseLayout() {
   const [downloadingSubmissionIds, setDownloadingSubmissionIds] = useState<
     Set<number>
   >(new Set());
+
+  const [isEnteringEdit, setIsEnteringEdit] = useState(false);
 
   // ── Derived: current course
   const course =
@@ -362,6 +366,22 @@ export default function FacilitatorCourseLayout() {
     } catch {}
   };
 
+  const handleEnterEditMode = async () => {
+    setIsEnteringEdit(true);
+    try {
+      if (await hasStalePartVersions(course.id)) {
+        await refreshCourse(course.id);
+      }
+    } catch {
+      try {
+        await refreshCourse(course.id);
+      } catch {}
+    } finally {
+      setIsEnteringEdit(false);
+      setIsEditMode(true);
+    }
+  };
+
   // ── Render
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -380,11 +400,12 @@ export default function FacilitatorCourseLayout() {
           {course.canManage &&
             (!isEditMode ? (
               <button
-                onClick={() => setIsEditMode(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all cursor-pointer"
+                onClick={handleEnterEditMode}
+                disabled={isEnteringEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg transition-all cursor-pointer"
               >
                 <Pencil size={14} />
-                Edit Course
+                {isEnteringEdit ? "Loading…" : "Edit Course"}
               </button>
             ) : (
               <button

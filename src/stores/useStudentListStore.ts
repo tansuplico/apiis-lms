@@ -4,6 +4,7 @@ import { Student } from "@/types/types";
 import { studentService } from "@/services/studentService";
 import { toast } from "react-toastify";
 import { useCenterStore } from "./useCenterStore";
+import { isOnline } from "@/services/networkStatus";
 
 interface StudentListStore {
   students: Student[];
@@ -29,6 +30,7 @@ export const useStudentListStore = create<StudentListStore>()((set) => ({
 
   // ── Actions: fetch all students
   fetchStudents: async () => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const students = await studentService.getAll();

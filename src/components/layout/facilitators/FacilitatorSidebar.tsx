@@ -168,7 +168,10 @@ export default function FacilitatorSidebar() {
 
       {/* Settings Modal */}
       {isSettingsModalOpen && (
-        <SettingsModal onClose={() => setIsSettingsModalOpen(false)} />
+        <SettingsModal
+          onClose={() => setIsSettingsModalOpen(false)}
+          restrictTicketOffline
+        />
       )}
     </>
   );

@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { AttendanceRecord } from "@/types/types";
 import { attendanceService } from "@/services/attendanceService";
 import { toast } from "react-toastify";
+import { isOnline } from "@/services/networkStatus";
 
 interface AttendanceSummaryStudent {
   studentId: number;
@@ -100,6 +101,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
 
   // ── Actions: get by center
   getAttendanceByCenter: async (centerId) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const records = await attendanceService.getByCenter(centerId);
@@ -119,6 +121,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
 
   // ── Actions: get by date
   getAttendanceByDate: async (centerId: number, date: string) => {
+    if (!isOnline()) return;
     try {
       const data = await attendanceService.getByCenter(centerId, { date });
       set((state) => ({
@@ -136,6 +139,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
 
   // ── Actions: get by facilitator
   getAttendanceByFacilitator: async (facilitatorId) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const records = await attendanceService.getByFacilitator(facilitatorId);
@@ -190,6 +194,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
 
   // ── Actions: fetch my attendance
   fetchMyAttendance: async (filters) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const result = await attendanceService.getMyAttendance(filters);
@@ -206,6 +211,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
 
   // ── Actions: fetch summary
   fetchSummary: async (centerId, filters) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const result = await attendanceService.getSummary(centerId, filters);
@@ -221,6 +227,7 @@ export const useAttendanceStore = create<AttendanceStore>()((set, get) => ({
   },
   // ── Actions: fetch one student's full attendance history (all centers)
   fetchStudentAttendance: async (studentId) => {
+    if (!isOnline()) return;
     set({ isLoadingStudentRecords: true });
     try {
       const result = await attendanceService.getByStudent(studentId);

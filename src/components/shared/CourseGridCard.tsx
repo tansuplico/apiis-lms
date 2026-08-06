@@ -3,7 +3,7 @@ import { BookOpen } from "lucide-react";
 import { Course, Role } from "@/types/types";
 import { useCourseCard } from "@/hooks/useCourseCard";
 import { useCourseProgress } from "@/hooks/useCourseProgress";
-import { resolveThumbnailUrl } from "@/utils/imageUtils";
+import { imageFallbackSrc, resolveThumbnailUrl } from "@/utils/imageUtils";
 
 export default function CourseGridCard({
   course,
@@ -50,10 +50,8 @@ export default function CourseGridCard({
             const img = e.target as HTMLImageElement;
             if (!img.dataset.errored) {
               img.dataset.errored = "1";
-              img.src = "/module-thumbnail.png";
+              img.src = imageFallbackSrc();
             } else {
-              // Fallback image itself errored — still settled, clear the
-              // placeholder rather than leaving it pulsing forever.
               onThumbnailSettled();
             }
           }}

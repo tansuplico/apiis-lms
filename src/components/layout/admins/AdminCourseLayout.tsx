@@ -44,6 +44,7 @@ export default function AdminCourseLayout() {
     uploadFile: storeUploadFile,
     deleteFile: storeDeleteFile,
     refreshCourse,
+    hasStalePartVersions,
   } = useCourseStore();
 
   const {
@@ -116,6 +117,8 @@ export default function AdminCourseLayout() {
   const [downloadingSubmissionIds, setDownloadingSubmissionIds] = useState<
     Set<number>
   >(new Set());
+
+  const [isEnteringEdit, setIsEnteringEdit] = useState(false);
 
   // ── Constants
   const PREDEFINED_PARTS = [
@@ -365,10 +368,19 @@ export default function AdminCourseLayout() {
   };
 
   const handleEnterEditMode = async () => {
+    setIsEnteringEdit(true);
     try {
-      await refreshCourse(course.id);
-    } catch {}
-    setIsEditMode(true);
+      if (await hasStalePartVersions(course.id)) {
+        await refreshCourse(course.id);
+      }
+    } catch {
+      try {
+        await refreshCourse(course.id);
+      } catch {}
+    } finally {
+      setIsEnteringEdit(false);
+      setIsEditMode(true);
+    }
   };
 
   // ── Render
@@ -389,10 +401,11 @@ export default function AdminCourseLayout() {
           {!isEditMode ? (
             <button
               onClick={handleEnterEditMode}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all cursor-pointer"
+              disabled={isEnteringEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg transition-all cursor-pointer"
             >
               <Pencil size={14} />
-              Edit Course
+              {isEnteringEdit ? "Loading…" : "Edit Course"}
             </button>
           ) : (
             <button

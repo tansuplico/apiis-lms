@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { QuizBankCollection } from "@/types/types";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
 import { toast } from "react-toastify";
-
+import { isOnline } from "@/services/networkStatus";
 interface QuizBankCollectionStore {
   collections: QuizBankCollection[];
   isLoading: boolean;
@@ -18,6 +18,7 @@ export const useQuizBankCollectionStore = create<QuizBankCollectionStore>()(
 
     // ── Actions: fetch all
     fetchCollections: async () => {
+      if (!isOnline()) return;
       set({ isLoading: true });
       try {
         const collections = await quizBankCollectionService.getAll();

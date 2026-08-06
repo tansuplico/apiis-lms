@@ -24,6 +24,14 @@ export const courseService = {
     return response.data!;
   },
 
+  getVersions: async (
+    courseId: number,
+  ): Promise<{ id: number; updatedAt: string }[]> => {
+    const response = await apiClient.get<{ id: number; updatedAt: string }[]>(
+      `/courses/${courseId}/versions`,
+    );
+    return response.data ?? [];
+  },
   create: async (data: CoursePayload & { title: string }): Promise<Course> => {
     const response = await apiClient.post<Course>("/courses", data);
     return response.data!;

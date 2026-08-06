@@ -93,9 +93,10 @@ interface CourseStore {
     fileId: number,
   ) => Promise<void>;
   applyEmbeddedContent: (contentByPartId: Map<number, string>) => void;
+  hasStalePartVersions: (courseId: number) => Promise<boolean>;
 }
 
-export const useCourseStore = create<CourseStore>()((set, _get) => ({
+export const useCourseStore = create<CourseStore>()((set, get) => ({
   // ── State
   courses: [],
   isLoading: false,
@@ -573,5 +574,24 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
         })),
       })),
     }));
+  },
+  hasStalePartVersions: async (courseId) => {
+    const versions = await courseService.getVersions(courseId);
+    const course = get().courses.find((c) => c.id === courseId);
+    if (!course) return true;
+
+    const local = new Map<number, string>();
+    course.modules.forEach((m) =>
+      m.parts.forEach((p) => {
+        if (p.updatedAt) local.set(p.id, p.updatedAt);
+      }),
+    );
+    if (versions.length !== local.size) return true;
+    return versions.some(
+      (v) =>
+        !local.has(v.id) ||
+        new Date(local.get(v.id)!).getTime() !==
+          new Date(v.updatedAt).getTime(),
+    );
   },
 }));

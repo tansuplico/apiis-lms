@@ -14,6 +14,7 @@ import {
   deletePart,
   updateQuizQuestions,
   reorderPart,
+  getCourseVersions,
 } from "../controllers/courseController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -97,6 +98,13 @@ router.patch(
   authenticate,
   authorize("admin", "facilitator"),
   reorderPart,
+);
+
+router.get(
+  "/:id/versions",
+  authenticate,
+  authorize("admin", "facilitator"),
+  getCourseVersions,
 );
 
 export default router;

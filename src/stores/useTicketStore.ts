@@ -3,9 +3,8 @@ import { create } from "zustand";
 import { Ticket, TicketStatus } from "@/types/types";
 import { apiClient } from "@/services/apiClient";
 import { toast } from "react-toastify";
+import { isOnline } from "@/services/networkStatus";
 
-// Persisted across reloads so the "new tickets" badge reflects what the
-// admin has and hasn't opened the Tickets page for, not just this session.
 const LAST_VIEWED_STORAGE_KEY = "apiis-admin-tickets-last-viewed";
 
 const readLastViewedAt = (): number => {
@@ -32,6 +31,7 @@ export const useTicketStore = create<TicketStore>()((set, get) => ({
 
   // ── Actions: fetch all tickets
   fetchTickets: async () => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       let page = 1;

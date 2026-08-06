@@ -105,7 +105,10 @@ export default function StudentSidebar() {
 
       {/* Settings Modal */}
       {isSettingsModalOpen && (
-        <SettingsModal onClose={() => setIsSettingsModalOpen(false)} />
+        <SettingsModal
+          onClose={() => setIsSettingsModalOpen(false)}
+          restrictTicketOffline
+        />
       )}
     </>
   );

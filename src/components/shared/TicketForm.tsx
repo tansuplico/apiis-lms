@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { apiClient } from "@/services/apiClient";
-
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 const CATEGORIES = [
   "Technical Issue",
   "Account Problem",
@@ -13,12 +13,22 @@ const CATEGORIES = [
   "Other",
 ];
 
-export default function TicketForm() {
+interface TicketFormProps {
+  restrictOffline?: boolean;
+}
+
+export default function TicketForm({
+  restrictOffline = false,
+}: TicketFormProps) {
   // ── State
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Online status (only enforced when restrictOffline is set)
+  const online = useOnlineStatus();
+  const blockedOffline = restrictOffline && !online;
 
   // ── Derived
   const isValid =
@@ -125,7 +135,7 @@ export default function TicketForm() {
       {/* Submit */}
       <button
         onClick={handleSubmit}
-        disabled={!isValid || isSubmitting}
+        disabled={!isValid || isSubmitting || blockedOffline}
         className="w-full flex items-center justify-center gap-2 bg-[#0070FF] hover:bg-[#0063e4] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-medium transition-all cursor-pointer"
       >
         {isSubmitting && <Loader2 size={16} className="animate-spin" />}

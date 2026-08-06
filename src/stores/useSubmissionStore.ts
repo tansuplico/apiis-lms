@@ -7,6 +7,7 @@ import {
   ModuleSubmission,
   MySubmissionsData,
 } from "@/services/submissionService";
+import { isOnline } from "@/services/networkStatus";
 
 interface SubmissionStore {
   settingsByModule: Record<number, SubmissionSettings>;
@@ -39,6 +40,7 @@ export const useSubmissionStore = create<SubmissionStore>()((set) => ({
 
   // ── Admin/facilitator: settings
   fetchSettings: async (moduleId) => {
+    if (!isOnline()) return;
     try {
       const settings = await submissionService.getSettings(moduleId);
       set((state) => ({
@@ -74,6 +76,7 @@ export const useSubmissionStore = create<SubmissionStore>()((set) => ({
 
   // ── Admin/facilitator: list + delete
   fetchModuleSubmissions: async (moduleId) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const submissions = await submissionService.listSubmissions(moduleId);
@@ -113,6 +116,7 @@ export const useSubmissionStore = create<SubmissionStore>()((set) => ({
 
   // ── Student: my submissions + upload
   fetchMySubmissions: async (moduleId) => {
+    if (!isOnline()) return;
     set({ isLoading: true });
     try {
       const data = await submissionService.getMySubmissions(moduleId);

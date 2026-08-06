@@ -6,9 +6,13 @@ import TicketForm from "@/components/shared/TicketForm";
 
 interface SettingsModalProps {
   onClose: () => void;
+  restrictTicketOffline?: boolean;
 }
 
-export default function SettingsModal({ onClose }: SettingsModalProps) {
+export default function SettingsModal({
+  onClose,
+  restrictTicketOffline = false,
+}: SettingsModalProps) {
   // ── Theme
   const { theme, setTheme } = useTheme();
 
@@ -101,7 +105,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               Submit a Support Ticket
             </h3>
-            <TicketForm />
+            <TicketForm restrictOffline={restrictTicketOffline} />
           </div>
         )}
 

@@ -5,6 +5,7 @@ const HEALTH_URL = import.meta.env.VITE_API_URL
   : "http://localhost:3000/health";
 
 const TIMEOUT_MS = 5000;
+const PRIME_TIMEOUT_MS = 2500;
 const POLL_INTERVAL_MS = 15000;
 const FAIL_THRESHOLD = 2;
 const RETRY_AFTER_FAIL_MS = 3000;
@@ -41,6 +42,23 @@ export async function checkOnline(): Promise<boolean> {
       setTimeout(() => checkOnline(), RETRY_AFTER_FAIL_MS);
     }
     return _cachedOnline;
+  }
+}
+
+export async function primeNetworkStatus(): Promise<boolean> {
+  try {
+    const response = await fetch(HEALTH_URL, {
+      method: "GET",
+      signal: AbortSignal.timeout(PRIME_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error("Non-OK response");
+    _failCount = 0;
+    _applyStatus(true);
+    return true;
+  } catch {
+    _failCount = FAIL_THRESHOLD;
+    _applyStatus(false);
+    return false;
   }
 }
 
