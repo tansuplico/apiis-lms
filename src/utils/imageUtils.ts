@@ -27,6 +27,43 @@ export async function toBase64(url: string): Promise<string> {
     return "";
   }
 }
+
+// src/utils/imageUtils.ts — append at the end of the file
+
+// Downscales and re-encodes an image file to a WebP data URI so it can be
+// stored inline in course content. Inline storage is what makes content
+// images work offline: nothing is fetched at sync time, so there is no host
+// to resolve, no CORS boundary, and no dependency on server disk state.
+// Note: animated GIFs are flattened to a single frame by the canvas.
+export async function fileToCompressedDataUrl(
+  file: File,
+  maxDimension = 1000,
+  quality = 0.75,
+): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read the image file."));
+      el.src = objectUrl;
+    });
+
+    const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not process the image.");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    return canvas.toDataURL("image/webp", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function resolveApiUrl(url: string): string {
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   const base = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");

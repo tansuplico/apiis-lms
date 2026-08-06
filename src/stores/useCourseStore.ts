@@ -92,6 +92,7 @@ interface CourseStore {
     moduleId: number,
     fileId: number,
   ) => Promise<void>;
+  applyEmbeddedContent: (contentByPartId: Map<number, string>) => void;
 }
 
 export const useCourseStore = create<CourseStore>()((set, _get) => ({
@@ -556,5 +557,21 @@ export const useCourseStore = create<CourseStore>()((set, _get) => ({
       toast.error(err.message ?? "Failed to delete file.");
       throw err;
     }
+  },
+  applyEmbeddedContent: (contentByPartId) => {
+    if (contentByPartId.size === 0) return;
+    set((state) => ({
+      courses: state.courses.map((course) => ({
+        ...course,
+        modules: (course.modules ?? []).map((module) => ({
+          ...module,
+          parts: (module.parts ?? []).map((part) =>
+            contentByPartId.has(part.id)
+              ? { ...part, content: contentByPartId.get(part.id)! }
+              : part,
+          ),
+        })),
+      })),
+    }));
   },
 }));

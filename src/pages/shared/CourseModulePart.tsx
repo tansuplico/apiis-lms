@@ -20,6 +20,7 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import { authHeaders } from "@/services/authHeadersService";
 import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import CoursePartViewer from "../admins/CoursePartViewer";
+import { fileToCompressedDataUrl } from "@/utils/imageUtils";
 
 export default function CourseModulePart() {
   // ── Routing
@@ -176,29 +177,33 @@ export default function CourseModulePart() {
     }
   };
 
+  // src/pages/shared/CourseModulePart.tsx — replace handleImageUpload entirely (~line 179)
+
   const handleImageUpload = async (file: File): Promise<string> => {
-    const headers = await authHeaders();
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-
-    if (res.status === 401) {
-      handleUnauthorizedResponse(res.status);
-      throw new Error("Unauthorized.");
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      toast.error("Only JPEG, PNG, WebP, and GIF images are allowed.");
+      throw new Error("Unsupported image type.");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be smaller than 5MB.");
+      throw new Error("Image too large.");
     }
 
-    if (!res.ok) {
-      toast.error("Image upload failed. Please try again.");
-      throw new Error("Image upload failed.");
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      // ~1.37x: base64 overhead plus the data: prefix.
+      if (dataUrl.length > 700 * 1024) {
+        toast.error(
+          "Image is too large even after compression. Try a smaller one.",
+        );
+        throw new Error("Compressed image too large.");
+      }
+      return dataUrl;
+    } catch (err) {
+      console.error("handleImageUpload failed:", err);
+      toast.error("Could not process that image. Please try another.");
+      throw err;
     }
-
-    const json = await res.json();
-    return json.data.url as string;
   };
 
   // ── Render

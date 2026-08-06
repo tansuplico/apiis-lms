@@ -10,7 +10,7 @@ const URL_REGEX = /^(https?:\/\/.+|\/api\/.+)/;
 const SLUG_REGEX = /^[a-z0-9-]+$/;
 const VALID_LEVELS = ["Easy", "Moderate", "Hard", "All Levels"];
 const MAX_TITLE_LENGTH = 100;
-const MAX_CONTENT_SIZE = 500 * 1024;
+const MAX_CONTENT_SIZE = 4 * 1024 * 1024;
 const MAX_QUIZ_QUESTIONS = 50;
 const MAX_QUIZ_OPTIONS = 6;
 const MAX_MATCHING_PAIRS = 6;
@@ -1247,12 +1247,10 @@ export const updatePart = async (req: Request, res: Response) => {
     if (content !== undefined) {
       const contentSize = Buffer.byteLength(content, "utf8");
       if (contentSize > MAX_CONTENT_SIZE) {
-        const hasBlobImages = /<img[^>]+src="data:/i.test(content);
         res.status(400).json({
           success: false,
-          message: hasBlobImages
-            ? "Content contains embedded images. Please upload images separately."
-            : "Content is too large.",
+          message:
+            "Content is too large. Try removing or replacing some images.",
         });
         return;
       }
@@ -1299,8 +1297,15 @@ export const updatePart = async (req: Request, res: Response) => {
       values.push(coverColor);
     }
     if (content !== undefined) {
-      updates.push(`content = $${paramCount++}`);
-      values.push(content);
+      const contentSize = Buffer.byteLength(content, "utf8");
+      if (contentSize > MAX_CONTENT_SIZE) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Content is too large. Try removing or replacing some images.",
+        });
+        return;
+      }
     }
 
     if (updates.length === 0) {

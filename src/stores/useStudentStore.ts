@@ -139,7 +139,10 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         console.error("fetchCenters failed during restoreSession:", err);
       }
       if (fetchedFresh) {
-        await syncCoursesToLocal(useCourseStore.getState().courses);
+        const embedded = await syncCoursesToLocal(
+          useCourseStore.getState().courses,
+        );
+        useCourseStore.getState().applyEmbeddedContent(embedded);
       }
 
       return { coursesFetched: true };
@@ -196,7 +199,10 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       }
 
       if (fetchedFresh) {
-        await syncCoursesToLocal(useCourseStore.getState().courses);
+        const embedded = await syncCoursesToLocal(
+          useCourseStore.getState().courses,
+        );
+        useCourseStore.getState().applyEmbeddedContent(embedded);
       }
       const fullStudent: Student = {
         ...student,

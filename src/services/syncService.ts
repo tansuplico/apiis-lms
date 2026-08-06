@@ -6,7 +6,10 @@ import {
 import { getLocalDb } from "./localDb";
 import { Course } from "@/types/types";
 
-export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
+export async function syncCoursesToLocal(
+  courses: Course[],
+): Promise<Map<number, string>> {
+  const embeddedContent = new Map<number, string>();
   const db = await getLocalDb();
 
   // ── Remove local courses that no longer exist on the server
@@ -91,7 +94,14 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
       for (const part of module.parts ?? []) {
         let localContent: string | null = part.content ?? null;
         if (part.content) {
+          const imgCount = (part.content.match(/<img/gi) ?? []).length;
+          console.log(
+            `sync: part ${part.id} (${part.name}) — ${imgCount} <img> tag(s), content length ${part.content.length}`,
+          );
           const { html, hadFailures } = await embedContentImages(part.content);
+          console.log(
+            `sync: part ${part.id} — embed ${hadFailures ? "HAD FAILURES" : "ok"}, result length ${html.length}, embedded ${(html.match(/src="data:/gi) ?? []).length}`,
+          );
           if (hadFailures) {
             const existing = await db.select<{ content: string | null }[]>(
               `SELECT content FROM local_parts WHERE id = $1`,
@@ -100,9 +110,9 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
             localContent = existing[0]?.content ?? html;
           } else {
             localContent = html;
+            embeddedContent.set(part.id, html);
           }
         }
-
         await db.execute(
           `INSERT INTO local_parts (id, module_id, course_id, slug, name, cover_color, content, order_num)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -175,6 +185,8 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
      ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
     [new Date().toISOString()],
   );
+
+  return embeddedContent;
 }
 
 export async function getLocalCourses(): Promise<Course[]> {
