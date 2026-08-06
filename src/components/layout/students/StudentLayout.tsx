@@ -12,7 +12,6 @@ import {
 } from "@/services/networkStatus";
 import { getLastSyncTime } from "@/services/syncService";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
-import UpdateNotifier from "@/components/shared/UpdateNotifier";
 import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
 
 export default function StudentLayout() {
@@ -73,7 +72,6 @@ export default function StudentLayout() {
   // ── Render
   return (
     <>
-      <UpdateNotifier />
       <BackgroundDecorationAlt />
       <div className="flex min-h-screen">
         <StudentSidebar />

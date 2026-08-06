@@ -123,25 +123,25 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
   // ── Render
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-4xl w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-gray overflow-y-auto">
-        <div className="flex justify-between items-center mb-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-gray overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
             Create New Course
-          </h2>
+          </h3>
           <button
             onClick={onClose}
-            className="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           >
-            <X size={32} className="text-gray-600 dark:text-gray-400" />
+            <X size={24} className="text-gray-600 dark:text-gray-400" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-10">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="title"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Course Title <span className="text-red-500">*</span>
             </label>
@@ -151,17 +151,17 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               value={form.title}
               maxLength={30}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. Atomic Habits for Students"
               required
             />
           </div>
 
           {/* Instructor */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="instructor"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Instructor
             </label>
@@ -171,16 +171,16 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               value={form.instructor}
               maxLength={30}
               onChange={(e) => setForm({ ...form, instructor: e.target.value })}
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. Prof. Elena Vargas"
             />
           </div>
 
           {/* Category */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="category"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Category
             </label>
@@ -188,7 +188,7 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               id="category"
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg appearance-none"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {COURSE_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -199,10 +199,10 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
           </div>
 
           {/* Level */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="level"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Level
             </label>
@@ -210,7 +210,7 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               id="level"
               value={form.level}
               onChange={(e) => setForm({ ...form, level: e.target.value })}
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg appearance-none"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Easy">Easy</option>
               <option value="Moderate">Moderate</option>
@@ -219,10 +219,10 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
           </div>
 
           {/* Subtitle */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="subtitle"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Subtitle
             </label>
@@ -232,16 +232,16 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               value={form.subtitle}
               maxLength={100}
               onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. Small changes, remarkable results"
             />
           </div>
 
           {/* Description */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="description"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Description
             </label>
@@ -252,21 +252,21 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. This course is about..."
             />
           </div>
 
           {/* Thumbnail — single upload, no library picker */}
-          <div className="space-y-4">
-            <label className="block text-base font-medium text-gray-700 dark:text-gray-300">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Thumbnail
             </label>
 
-            <div className="relative w-full max-w-xs aspect-video rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
+            <div className="relative w-full max-w-50 aspect-video rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
               {uploading && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                  <Loader2 size={28} className="animate-spin text-white" />
+                  <Loader2 size={24} className="animate-spin text-white" />
                 </div>
               )}
               {thumbnailUrl ? (
@@ -280,8 +280,8 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
                   }}
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-gray-500">
-                  <ImageOff size={28} />
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-400 dark:text-gray-500">
+                  <ImageOff size={24} />
                   <span className="text-xs">No image selected</span>
                 </div>
               )}
@@ -294,12 +294,12 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
               className="hidden"
               onChange={handleThumbnailUpload}
             />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mt-3">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading || !online}
-                className="flex items-center gap-2 px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {uploading ? (
                   <>
@@ -314,24 +314,24 @@ export default function CreateCourseModal({ onClose }: CreateCourseModalProps) {
                 )}
               </button>
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               JPEG, PNG, WebP or GIF · Max 10 MB
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-5  border-gray-200 dark:border-gray-700">
+          <div className="mt-8 flex gap-4">
             <button
               type="submit"
               disabled={!online}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed text-white py-4 px-8 rounded-xl font-medium text-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 shadow-md hover:shadow-lg"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-medium cursor-pointer"
             >
               Create Course
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 py-4 px-8 rounded-xl font-medium text-lg transition-all cursor-pointer"
+              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 py-3 px-6 rounded-xl font-medium cursor-pointer"
             >
               Cancel
             </button>

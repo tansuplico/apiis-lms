@@ -70,6 +70,7 @@ import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ThemeProvider } from "./hooks/useTheme";
+import UpdateNotifier from "./components/shared/UpdateNotifier";
 
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
@@ -159,6 +160,7 @@ export default function App() {
       <BrowserRouter>
         <NavigationRegistrar />
         <ScrollToTop />
+        <UpdateNotifier />
         {!isInitialized ? (
           <div className="min-h-screen flex items-center justify-center bg-white/70 dark:bg-gray-950/70 backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl px-11 py-8 flex flex-col items-center gap-4">

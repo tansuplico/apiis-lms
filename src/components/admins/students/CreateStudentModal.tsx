@@ -1,5 +1,5 @@
 // src/components/admins/students/CreateStudentModal.tsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { X, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCenterStore } from "@/stores/useCenterStore";
@@ -34,6 +34,13 @@ export default function CreateStudentModal({
   });
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  // Synchronous guard against double-submission: `isCreating` state only
+  // disables the button after a re-render, so a rapid double-click (or a
+  // second click while waiting on a slow/spotty connection) can fire
+  // handleCreate twice before React catches up. The second request then hits
+  // a real backend 409 "ID already exists" for the row the first request just
+  // created — a false-looking duplicate warning even though creation succeeded.
+  const isSubmittingRef = useRef(false);
 
   // ── Helpers
   const generatePassword = () =>
@@ -83,8 +90,10 @@ export default function CreateStudentModal({
 
   // ── Handlers: create student
   const handleCreate = async () => {
+    if (isSubmittingRef.current) return;
     if (!validateFields()) return;
 
+    isSubmittingRef.current = true;
     setIsCreating(true);
     try {
       await addStudent({
@@ -111,6 +120,7 @@ export default function CreateStudentModal({
     } catch {
       // error toast handled by store (addStudent)
     } finally {
+      isSubmittingRef.current = false;
       setIsCreating(false);
     }
   };
@@ -228,10 +238,15 @@ export default function CreateStudentModal({
                 type={showNewPassword ? "text" : "password"}
                 value={newStudent.password}
                 onChange={(e) =>
-                  setNewStudent({ ...newStudent, password: e.target.value })
+                  setNewStudent({
+                    ...newStudent,
+                    password: e.target.value.replace(/\D/g, "").slice(0, 5),
+                  })
                 }
                 className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-20"
                 placeholder="Enter password"
+                maxLength={5}
+                inputMode="numeric"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <button

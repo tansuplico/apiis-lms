@@ -239,11 +239,13 @@ export default function EditStudentModal({
                 onChange={(e) =>
                   setStudentToEdit({
                     ...studentToEdit,
-                    password: e.target.value,
+                    password: e.target.value.replace(/\D/g, "").slice(0, 5),
                   })
                 }
                 className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
                 placeholder="Enter new password (leave blank to keep current)"
+                maxLength={5}
+                inputMode="numeric"
               />
               <button
                 type="button"

@@ -17,8 +17,6 @@ import CourseQuiz from "../admins/CourseQuiz";
 import TipTapEditor from "@/components/admins/courses/TipTapEditor";
 import { Course, QuizQuestion } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
-import { authHeaders } from "@/services/authHeadersService";
-import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
 import CoursePartViewer from "../admins/CoursePartViewer";
 import { fileToCompressedDataUrl } from "@/utils/imageUtils";
 

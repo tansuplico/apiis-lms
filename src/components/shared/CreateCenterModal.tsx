@@ -82,25 +82,24 @@ export default function CreateCenterModal({
   // ── Render
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray">
-        {" "}
-        <div className="flex justify-between items-center mb-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
             Create New Center
-          </h2>
+          </h3>
           <button
             onClick={onClose}
-            className="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           >
-            <X size={32} className="text-gray-600 dark:text-gray-400" />
+            <X size={24} className="text-gray-600 dark:text-gray-400" />
           </button>
         </div>
-        <form onSubmit={handleCreateCenter} className="space-y-10">
+        <form onSubmit={handleCreateCenter} className="space-y-6">
           {/* Center Name */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="title"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Center Name <span className="text-red-500">*</span>
             </label>
@@ -111,17 +110,17 @@ export default function CreateCenterModal({
               onChange={(e) =>
                 setNewCenter({ ...newCenter, title: e.target.value })
               }
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. Watawat Advanced"
               required
             />
           </div>
 
           {/* Location */}
-          <div className="space-y-3">
+          <div>
             <label
               htmlFor="location"
-              className="block text-base font-medium text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Location
             </label>
@@ -132,21 +131,21 @@ export default function CreateCenterModal({
               onChange={(e) =>
                 setNewCenter({ ...newCenter, location: e.target.value })
               }
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg"
+              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g. Barangay Poblacion, Cebu City"
             />
           </div>
 
           {/* Thumbnail Upload */}
-          <div className="space-y-4">
-            <label className="block text-base font-medium text-gray-700 dark:text-gray-300">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Thumbnail{" "}
-              <span className="text-gray-400 dark:text-gray-500 font-normal text-sm">
+              <span className="text-gray-400 dark:text-gray-500 font-normal">
                 (optional)
               </span>
             </label>
 
-            <div className="relative w-full max-w-xs aspect-video rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
+            <div className="relative w-full max-w-50 aspect-video rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
               {newCenter.thumbnailUrl ? (
                 <img
                   src={previewSrc}
@@ -172,12 +171,12 @@ export default function CreateCenterModal({
               className="hidden"
               onChange={handleUpload}
             />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mt-3">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading || !online}
-                className="flex items-center gap-2 px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {uploading ? (
                   <>
@@ -203,24 +202,24 @@ export default function CreateCenterModal({
                 </button>
               )}
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               JPEG, PNG, WebP or GIF · Max 10 MB
             </p>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-5 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-8 flex gap-4">
             <button
               type="submit"
               disabled={uploading || !online}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-700 dark:hover:bg-green-600 disabled:dark:bg-green-800 text-white py-4 px-8 rounded-xl font-medium text-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 shadow-md hover:shadow-lg"
+              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-700 dark:hover:bg-green-600 disabled:dark:bg-green-800 text-white py-3 px-6 rounded-xl font-medium cursor-pointer disabled:cursor-not-allowed"
             >
               Create Center
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 py-4 px-8 rounded-xl font-medium text-lg transition-all cursor-pointer"
+              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 py-3 px-6 rounded-xl font-medium cursor-pointer"
             >
               Cancel
             </button>

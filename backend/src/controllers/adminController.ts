@@ -271,6 +271,10 @@ export const updateAdmin = async (req: Request, res: Response) => {
       updates.push(`status = $${paramCount++}`);
       values.push(status);
     }
+    if (status === "banned") {
+      updates.push(`session_id = NULL`);
+      updates.push(`session_last_active = NULL`);
+    }
 
     if (updates.length === 0) {
       res.status(400).json({ success: false, message: "No fields to update." });

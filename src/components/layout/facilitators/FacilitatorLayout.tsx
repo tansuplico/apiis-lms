@@ -10,7 +10,6 @@ import {
   onNetworkChange,
   startNetworkPolling,
 } from "@/services/networkStatus";
-import UpdateNotifier from "@/components/shared/UpdateNotifier";
 import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
 
 export default function FacilitatorLayout() {
@@ -52,7 +51,6 @@ export default function FacilitatorLayout() {
   // ── Render
   return (
     <>
-      <UpdateNotifier />
       <BackgroundDecorationAlt />
       <div className="flex min-h-screen">
         <FacilitatorSidebar />

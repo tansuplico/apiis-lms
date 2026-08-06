@@ -10,7 +10,6 @@ import {
   onNetworkChange,
   startNetworkPolling,
 } from "@/services/networkStatus";
-import UpdateNotifier from "@/components/shared/UpdateNotifier";
 import BackgroundDecoration from "@/components/ui/BackgroundDecoration";
 
 export default function AdminLayout() {
@@ -54,7 +53,6 @@ export default function AdminLayout() {
   // ── Render
   return (
     <>
-      <UpdateNotifier />
       <BackgroundDecoration />
       <div className="flex min-h-screen">
         <AdminSidebar />
