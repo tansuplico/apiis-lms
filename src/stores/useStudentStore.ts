@@ -175,9 +175,26 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
     try {
       const progress = await studentService.getProgress();
-      await useShopStore.getState().fetchItems();
-      const fetchedFresh = await useCourseStore.getState().fetchCourses();
-      await useCenterStore.getState().fetchCenters();
+
+      try {
+        await useShopStore.getState().fetchItems();
+      } catch (err) {
+        console.error("fetchItems failed during login:", err);
+      }
+
+      let fetchedFresh = false;
+      try {
+        fetchedFresh = await useCourseStore.getState().fetchCourses();
+      } catch (err) {
+        console.error("fetchCourses failed during login:", err);
+      }
+
+      try {
+        await useCenterStore.getState().fetchCenters();
+      } catch (err) {
+        console.error("fetchCenters failed during login:", err);
+      }
+
       if (fetchedFresh) {
         await syncCoursesToLocal(useCourseStore.getState().courses);
       }

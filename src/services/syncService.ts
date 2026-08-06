@@ -1,4 +1,8 @@
-import { toBase64 } from "@/utils/imageUtils";
+import {
+  embedContentImages,
+  resolveApiUrl,
+  toBase64,
+} from "@/utils/imageUtils";
 import { getLocalDb } from "./localDb";
 import { Course } from "@/types/types";
 
@@ -85,12 +89,16 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
       );
 
       for (const part of module.parts ?? []) {
+        const localContent = part.content
+          ? await embedContentImages(part.content)
+          : null;
+
         await db.execute(
           `INSERT INTO local_parts (id, module_id, course_id, slug, name, cover_color, content, order_num)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-           ON CONFLICT(id) DO UPDATE SET
-            name=excluded.name, cover_color=excluded.cover_color,
-            content=excluded.content, order_num=excluded.order_num`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, cover_color=excluded.cover_color,
+      content=excluded.content, order_num=excluded.order_num`,
           [
             part.id,
             module.id,
@@ -98,28 +106,33 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
             part.slug,
             part.name,
             part.coverColor,
-            part.content ?? null,
+            localContent,
             part.order,
           ],
         );
 
         for (const [index, q] of (part.quizQuestions ?? []).entries()) {
+          let localImageUrl = q.imageUrl ?? null;
+          if (localImageUrl && !localImageUrl.startsWith("data:")) {
+            const base64 = await toBase64(resolveApiUrl(localImageUrl));
+            if (base64) localImageUrl = base64;
+          }
           await db.execute(
             `INSERT INTO local_quiz_questions
-              (id, part_id, module_id, course_id, type, question, options,
-               correct_option_index, correct_answer, correct_answers,
-               correct_boolean, matching_pairs, image_url, explanation,
-               order_num)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-             ON CONFLICT(id) DO UPDATE SET
-              question=excluded.question, options=excluded.options,
-              correct_option_index=excluded.correct_option_index,
-              correct_answer=excluded.correct_answer,
-              correct_answers=excluded.correct_answers,
-              correct_boolean=excluded.correct_boolean,
-              matching_pairs=excluded.matching_pairs,
-              image_url=excluded.image_url,
-              explanation=excluded.explanation`,
+        (id, part_id, module_id, course_id, type, question, options,
+         correct_option_index, correct_answer, correct_answers,
+         correct_boolean, matching_pairs, image_url, explanation,
+         order_num)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ON CONFLICT(id) DO UPDATE SET
+        question=excluded.question, options=excluded.options,
+        correct_option_index=excluded.correct_option_index,
+        correct_answer=excluded.correct_answer,
+        correct_answers=excluded.correct_answers,
+        correct_boolean=excluded.correct_boolean,
+        matching_pairs=excluded.matching_pairs,
+        image_url=excluded.image_url,
+        explanation=excluded.explanation`,
             [
               q.id,
               part.id,
@@ -137,7 +150,7 @@ export async function syncCoursesToLocal(courses: Course[]): Promise<void> {
                   : 0
                 : null,
               q.matchingPairs ? JSON.stringify(q.matchingPairs) : null,
-              q.imageUrl ?? null,
+              localImageUrl,
               q.explanation ?? null,
               index,
             ],

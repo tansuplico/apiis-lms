@@ -1,6 +1,6 @@
 // src/routes/authRoutes.ts
-import { Router } from "express";
-import rateLimit from "express-rate-limit";
+import { Router, type Request } from "express";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import {
   studentLogin,
   facilitatorLogin,
@@ -14,11 +14,20 @@ import { authenticate } from "../middleware/auth";
 
 const router = Router();
 
+const loginKeyGenerator = (req: Request): string => {
+  const identifier = (req.body?.idNumber ?? req.body?.email ?? "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  return `${ipKeyGenerator(req.ip as string)}:${identifier || "unknown"}`;
+};
+
 // ── Rate limiter for login attempts
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
   skipSuccessfulRequests: true,
+  keyGenerator: loginKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
