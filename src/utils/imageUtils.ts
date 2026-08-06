@@ -1,19 +1,32 @@
+// src/utils/imageUtils.ts — replace toBase64() entirely
 export async function toBase64(url: string): Promise<string> {
   try {
     const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return "";
+    if (!res.ok) {
+      console.error(
+        `toBase64: HTTP ${res.status} ${res.statusText} for ${url}`,
+      );
+      return "";
+    }
     const blob = await res.blob();
+    if (blob.size === 0) {
+      console.error(`toBase64: empty blob for ${url}`);
+      return "";
+    }
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve("");
+      reader.onerror = () => {
+        console.error(`toBase64: FileReader failed for ${url}`, reader.error);
+        resolve("");
+      };
       reader.readAsDataURL(blob);
     });
-  } catch {
+  } catch (err) {
+    console.error(`toBase64: fetch threw for ${url}`, err);
     return "";
   }
 }
-
 export function resolveApiUrl(url: string): string {
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   const base = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, "");

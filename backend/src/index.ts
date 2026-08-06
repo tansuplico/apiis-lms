@@ -82,6 +82,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : defaultTauriOrigins;
 
 app.use(
+  ["/api/content-images", "/api/thumbnails", "/api/center-thumbnails"],
+  cors({ origin: "*" }),
+);
+
+app.use(
   cors({
     origin: isDev ? "*" : allowedOrigins,
     credentials: true,
