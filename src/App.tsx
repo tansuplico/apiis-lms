@@ -71,7 +71,7 @@ import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore"
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ThemeProvider } from "./hooks/useTheme";
 import UpdateNotifier from "./components/shared/UpdateNotifier";
-
+import { useLockRefresh } from "./hooks/useLockRefresh";
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
   const navigate = useNavigate();
@@ -82,6 +82,8 @@ function NavigationRegistrar() {
 }
 
 export default function App() {
+  useLockRefresh();
+
   // ── Store actions
   const restoreAdminSession = useAdminStore((s) => s.restoreSession);
   const restoreFacilitatorSession = useFacilitatorStore(
