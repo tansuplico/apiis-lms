@@ -22,7 +22,7 @@ import VideoPreviewModal from "@/components/admins/courses/VideoPreviewModal";
 import AddPartModal from "@/components/admins/courses/AddPartModal";
 import { fileService } from "@/services/fileService";
 import { submissionService } from "@/services/submissionService";
-import { isOnline } from "@/services/networkStatus";
+import { isOnline, onNetworkChange } from "@/services/networkStatus";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 
 export default function AdminCourseLayout() {
@@ -135,6 +135,13 @@ export default function AdminCourseLayout() {
           .replace(/\s+/g, "-")
           .replace(/[^a-z0-9-]/g, "") === courseSlug,
     ) ?? courses[0];
+
+  const [online, setOnline] = useState(isOnline());
+
+  useEffect(() => {
+    const unsubscribe = onNetworkChange(setOnline);
+    return () => unsubscribe();
+  }, []);
 
   // ── Effects: lazy-load submission settings + list when a module is expanded
   useEffect(() => {
@@ -401,7 +408,8 @@ export default function AdminCourseLayout() {
           {!isEditMode ? (
             <button
               onClick={handleEnterEditMode}
-              disabled={isEnteringEdit}
+              disabled={isEnteringEdit || !online}
+              title={!online ? "You're offline" : "Edit Course"}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg transition-all cursor-pointer"
             >
               <Pencil size={14} />

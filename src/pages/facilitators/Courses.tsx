@@ -13,7 +13,7 @@ import CourseListItemSkeleton from "@/components/ui/CourseListItemSkeleton";
 import CourseGridCardSkeleton from "@/components/ui/CourseGridCardSkeleton";
 import { useCourseStore } from "@/stores/useCourseStore";
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 8;
 
 export default function Courses() {
   // ── Store

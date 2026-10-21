@@ -19,7 +19,7 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import { isOnline, onNetworkChange } from "@/services/networkStatus";
 import FilterDropdown from "@/components/shared/FilterDropdown";
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 8;
 
 export default function Courses() {
   // ── View, search & pagination state

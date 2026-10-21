@@ -13,11 +13,6 @@ import { ApiError } from "@/services/apiClient";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 import { isOnline } from "@/services/networkStatus";
 import { withNetworkRetry } from "@/services/networkRetryService";
-import {
-  clearLocalFacilitatorSession,
-  loadLocalFacilitatorSession,
-  saveLocalFacilitatorSession,
-} from "@/services/sessionStorage";
 
 interface FacilitatorStore {
   currentFacilitator: Facilitator | null;
@@ -50,20 +45,14 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
 
       if (payload.exp && payload.exp * 1000 < Date.now()) {
         await tokenStorage.clearAllTokens();
-        await clearLocalFacilitatorSession();
         return;
       }
 
-      if (!isOnline()) {
-        const cached = await loadLocalFacilitatorSession();
-        if (cached) set({ currentFacilitator: cached, isAuthenticated: true });
-        return;
-      }
+      if (!isOnline()) return;
 
       const facilitator = await withNetworkRetry(() =>
         facilitatorService.getById(payload.id),
       );
-      await saveLocalFacilitatorSession(facilitator);
       set({ currentFacilitator: facilitator, isAuthenticated: true });
 
       try {
@@ -74,7 +63,6 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         await tokenStorage.clearAllTokens();
-        await clearLocalFacilitatorSession();
         set({ currentFacilitator: null, isAuthenticated: false });
       }
     }
@@ -107,7 +95,6 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
   // ── Actions: logout
   logout: async () => {
     await facilitatorService.logout();
-    await clearLocalFacilitatorSession();
     set({ currentFacilitator: null, isAuthenticated: false });
     navigateTo("/facilitator-admin/login");
   },
