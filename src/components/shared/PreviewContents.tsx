@@ -1,7 +1,9 @@
 // src/components/shared/PreviewContents.tsx
 import { useState } from "react";
-import { Course } from "@/types/types";
+import { Plus } from "lucide-react";
+import { Course, CourseModule } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface PreviewContentsProps {
   course: Course;
@@ -10,15 +12,21 @@ interface PreviewContentsProps {
     field: K,
     value: Course[K],
   ) => void;
+  onModulesPersisted?: (
+    transform: (modules: CourseModule[]) => CourseModule[],
+  ) => void;
 }
 
 export default function PreviewContents({
   course,
   isEditing = false,
   updateCourseField,
+  onModulesPersisted,
 }: PreviewContentsProps) {
   // ── Store
-  const { updateModule } = useCourseStore();
+  const { addModule } = useCourseStore();
+  const online = useOnlineStatus();
+  const [isAddingModule, setIsAddingModule] = useState(false);
 
   // ── State
   const [editingModuleIndex, setEditingModuleIndex] = useState<number | null>(
@@ -27,27 +35,33 @@ export default function PreviewContents({
   const [editingTitle, setEditingTitle] = useState("");
 
   // ── Handlers
-  const saveModuleTitle = async (modIdx: number) => {
-    if (!editingTitle.trim()) {
+  const saveModuleTitle = (modIdx: number) => {
+    const trimmed = editingTitle.trim();
+    const module = course.modules[modIdx];
+
+    if (!trimmed || !module || trimmed === module.title) {
       setEditingModuleIndex(null);
       return;
     }
 
-    const module = course.modules[modIdx];
-    if (!module) return;
+    const updatedModules = [...course.modules];
+    updatedModules[modIdx] = { ...module, title: trimmed };
+    updateCourseField?.("modules", updatedModules);
+    setEditingModuleIndex(null);
+  };
 
+  // Hits the server immediately (needs a real id), so it's applied to both the
+  // working copy and the Cancel snapshot via the parent.
+  const handleAddModule = async () => {
+    if (isAddingModule || !online) return;
+    setIsAddingModule(true);
     try {
-      await updateModule(course.id, module.id, { title: editingTitle.trim() });
-      const updatedModules = [...course.modules];
-      updatedModules[modIdx] = {
-        ...updatedModules[modIdx],
-        title: editingTitle.trim(),
-      };
-      updateCourseField?.("modules", updatedModules);
+      const created = await addModule(course.id);
+      onModulesPersisted?.((modules) => [...modules, created]);
     } catch {
-      // silent
+      // error toast handled by the store
     } finally {
-      setEditingModuleIndex(null);
+      setIsAddingModule(false);
     }
   };
 
@@ -130,6 +144,23 @@ export default function PreviewContents({
             </div>
           </div>
         ))
+      )}
+
+      {isEditing && (
+        <div>
+          <button
+            onClick={handleAddModule}
+            disabled={isAddingModule || !online}
+            title={!online ? "You're offline" : undefined}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus size={18} />
+            {isAddingModule ? "Adding..." : "Add New Module"}
+          </button>
+          <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+            New modules are created immediately. Cancel won't remove them.
+          </p>
+        </div>
       )}
     </section>
   );

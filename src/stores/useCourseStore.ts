@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import {
   Course,
+  CourseModule,
   CoursePart,
   ModuleFile,
   ModuleVideo,
@@ -27,7 +28,7 @@ interface CourseStore {
     field: keyof Course,
     value: any,
   ) => Promise<void>;
-  addModule: (courseId: number, title?: string) => Promise<void>;
+  addModule: (courseId: number, title?: string) => Promise<CourseModule>;
   updateModule: (
     courseId: number,
     moduleId: number,
@@ -200,6 +201,8 @@ export const useCourseStore = create<CourseStore>()((set, get) => ({
           c.id === courseId ? { ...c, modules: [...c.modules, newModule] } : c,
         ),
       }));
+
+      return newModule;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to add module.");
       throw err;

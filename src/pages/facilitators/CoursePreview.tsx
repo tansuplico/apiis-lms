@@ -21,7 +21,14 @@ export default function CoursePreview() {
   const location = useLocation();
   const navigate = useNavigate();
   const { courseId } = useParams();
-  const { courses, updateCourse } = useCourseStore();
+  const { courses, updateCourse, updateModule } = useCourseStore();
+
+  const applyPersistedModules = (
+    transform: (modules: Course["modules"]) => Course["modules"],
+  ) => {
+    setCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
+    setOriginalCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
+  };
 
   // ── Derived: resolve course from store, falling back to navigation state
   const passedCourse = location.state?.course;
@@ -161,6 +168,16 @@ export default function CoursePreview() {
         bgColor: course.bgColor,
         thumbnailUrl: thumbnailToSave,
       });
+
+      // ── Persist staged module renames (only modules whose title changed)
+      for (const mod of course.modules as Course["modules"]) {
+        const original = (originalCourse.modules as Course["modules"]).find(
+          (m) => m.id === mod.id,
+        );
+        if (original && original.title !== mod.title) {
+          await updateModule(course.id, mod.id, { title: mod.title });
+        }
+      }
 
       setOriginalCourse(course);
       setIsEditing(false);
@@ -473,6 +490,7 @@ export default function CoursePreview() {
             course={course}
             isEditing={isEditing}
             updateCourseField={updateCourseField}
+            onModulesPersisted={applyPersistedModules}
           />
         )}
       </div>
