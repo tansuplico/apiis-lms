@@ -7,6 +7,9 @@ import { useStudentListStore } from "@/stores/useStudentListStore";
 import { formatStudentId } from "@/utils/formatter";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
+const generatePassword = () =>
+  String(Math.floor(10000 + Math.random() * 90000));
+
 interface CreateStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,7 +32,7 @@ export default function CreateStudentModal({
     middleName: "",
     lastName: "",
     idNumber: "",
-    password: "",
+    password: generatePassword(),
     currentCenter: null as number | null,
   });
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -41,10 +44,6 @@ export default function CreateStudentModal({
   // a real backend 409 "ID already exists" for the row the first request just
   // created — a false-looking duplicate warning even though creation succeeded.
   const isSubmittingRef = useRef(false);
-
-  // ── Helpers
-  const generatePassword = () =>
-    String(Math.floor(10000 + Math.random() * 90000));
 
   const isValidStudentId = (id: string): boolean =>
     /^\d{2}-\d{4}-\d{2}$/.test(id);
@@ -276,7 +275,7 @@ export default function CreateStudentModal({
             </div>
             <div className="mt-1 flex items-center justify-between">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Must be exactly 5 digits
+                Auto-generated 5-digit code. Copy it to give to the student
               </p>
               {newStudent.password && (
                 <button
