@@ -605,6 +605,13 @@ export default function FacilitatorAttendanceOverview({
               </div>
             </div>
 
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              {selectedCenter || availableCenters.length === 1
+                ? "Center"
+                : "Centers"}
+              : {selectedCenter || availableCenters.join(", ") || "—"}
+            </p>
+
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -615,9 +622,6 @@ export default function FacilitatorAttendanceOverview({
                       </th>
                       <th className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
                         ID
-                      </th>
-                      <th className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Center(s)
                       </th>
                       <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
                         Present
@@ -634,7 +638,7 @@ export default function FacilitatorAttendanceOverview({
                     {!isCurrentDataReady ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={5}
                           className="text-center py-12 text-gray-500 dark:text-gray-400"
                         >
                           Loading...
@@ -643,7 +647,7 @@ export default function FacilitatorAttendanceOverview({
                     ) : filteredSummary.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={5}
                           className="text-center py-12 text-gray-500 dark:text-gray-400"
                         >
                           {searchTerm
@@ -670,9 +674,6 @@ export default function FacilitatorAttendanceOverview({
                           </td>
                           <td className="px-6 py-4 text-gray-600 dark:text-gray-400 font-mono text-sm">
                             {s.idNumber}
-                          </td>
-                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400 text-sm">
-                            {s.centerTitles.join(", ") || "—"}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
@@ -869,6 +870,10 @@ export default function FacilitatorAttendanceOverview({
               Export CSV
             </button>
           </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            {availableCenters.length === 1 ? "Center" : "Centers"}:{" "}
+            {availableCenters.join(", ") || "—"}
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             A facilitator is marked Present on a day if they submitted at least
             one student attendance record that day, across any center. The time
@@ -890,16 +895,13 @@ export default function FacilitatorAttendanceOverview({
                     <th className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Time Submitted
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Center(s)
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {!isCurrentDataReady ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={3}
                         className="text-center py-12 text-gray-500 dark:text-gray-400"
                       >
                         Loading...
@@ -908,7 +910,7 @@ export default function FacilitatorAttendanceOverview({
                   ) : sheetRows.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={3}
                         className="text-center py-12 text-gray-500 dark:text-gray-400"
                       >
                         No weekdays to show for this month (either it's in the
@@ -944,9 +946,6 @@ export default function FacilitatorAttendanceOverview({
                           {row.earliestSubmittedAt
                             ? formatTime(row.earliestSubmittedAt)
                             : "—"}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400 text-sm">
-                          {row.centerTitles.join(", ") || "—"}
                         </td>
                       </tr>
                     ))
