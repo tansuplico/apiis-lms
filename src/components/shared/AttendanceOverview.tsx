@@ -1,10 +1,11 @@
 // src/components/shared/AttendanceOverview.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ArrowUpDown } from "lucide-react";
+import { Search, ArrowUpDown, Download } from "lucide-react";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import StudentAttendanceModal from "./StudentAttendanceModal";
+import { buildCsv, downloadCsv, toFilenamePart } from "@/utils/csvExport";
 
 interface AttendanceOverviewProps {
   centerId: number;
@@ -87,6 +88,30 @@ export default function AttendanceOverview({
   }, [summary, searchTerm, sortKey]);
 
   // ── Handlers
+  // Exports exactly the rows currently shown (search + sort applied).
+  const handleExportCsv = async () => {
+    const header = [
+      "Student",
+      "ID",
+      "Present",
+      "Absent",
+      "Attendance Rate (%)",
+    ];
+    const rows = filteredSummary.map((s) => [
+      `${s.firstName} ${s.lastName}`,
+      s.idNumber,
+      s.presentDays,
+      s.absentDays,
+      s.attendanceRate,
+    ]);
+    const filename = `${toFilenamePart(centerName ?? `center-${centerId}`)}_student-attendance.csv`;
+    await downloadCsv(
+      filename,
+      buildCsv(header, rows),
+      "the attendance report",
+    );
+  };
+
   const handleSelectDay = (dateStr: string) => {
     const hasSession = dayData[dateStr]?.total > 0;
     if (!hasSession) return;
@@ -124,6 +149,15 @@ export default function AttendanceOverview({
             >
               <ArrowUpDown size={14} />
               {sortKey === "absent" ? "Most absences" : "Name"}
+            </button>
+            <button
+              onClick={handleExportCsv}
+              disabled={!isCurrentDataReady || filteredSummary.length === 0}
+              title="Export the students shown to CSV"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-sm font-medium whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download size={14} />
+              Export CSV
             </button>
           </div>
         </div>

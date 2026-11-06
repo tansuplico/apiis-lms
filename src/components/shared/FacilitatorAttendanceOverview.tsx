@@ -1,7 +1,6 @@
 // src/components/shared/FacilitatorAttendanceOverview.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
 import {
   Search,
   ArrowUpDown,
@@ -12,6 +11,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
+import { buildCsv, downloadCsv } from "@/utils/csvExport";
 import AttendanceCalendar, { DayAttendanceSummary } from "./AttendanceCalendar";
 import StudentAttendanceModal from "./StudentAttendanceModal";
 import FilterDropdown from "./FilterDropdown";
@@ -83,33 +83,17 @@ const startOfDay = (d: Date) => {
   return copy;
 };
 
-// ── CSV export: builds the CSV text only. Saving to disk uses the same
-// pattern as fileService.ts's course-content file download — the browser's
-// native File System Access API (showSaveFilePicker), which WebView2
-// (Chromium-based, used by Tauri on Windows) supports directly with no
-// Tauri plugin involved. Falls back to a blob + <a download> for
-// engines that don't support it, same as fileService.ts.
-const buildCsvContent = (rows: FacilitatorSheetRow[]) => {
-  const escape = (value: string) =>
-    value.includes(",") || value.includes('"')
-      ? `"${value.replace(/"/g, '""')}"`
-      : value;
+// ── CSV export rows. Building/escaping and saving to disk live in
+// @/utils/csvExport (shared with the other exports).
+const SHEET_CSV_HEADER = ["Date", "Status", "Time Submitted", "Center(s)"];
 
-  const header = ["Date", "Status", "Time Submitted", "Center(s)"];
-  const lines = [
-    header.join(","),
-    ...rows.map((r) =>
-      [
-        r.dateKey,
-        r.status === "present" ? "Present" : "Absent",
-        r.earliestSubmittedAt ? formatTime(r.earliestSubmittedAt) : "",
-        escape(r.centerTitles.join("; ") || ""),
-      ].join(","),
-    ),
-  ];
-
-  return lines.join("\n");
-};
+const sheetToCsvRows = (rows: FacilitatorSheetRow[]) =>
+  rows.map((r) => [
+    r.dateKey,
+    r.status === "present" ? "Present" : "Absent",
+    r.earliestSubmittedAt ? formatTime(r.earliestSubmittedAt) : "",
+    r.centerTitles.join("; "),
+  ]);
 
 export default function FacilitatorAttendanceOverview({
   facilitatorId,
@@ -466,38 +450,11 @@ export default function FacilitatorAttendanceOverview({
       .toLowerCase()
       .replace(/\s+/g, "-");
     const filename = `${safeName}_attendance-sheet_${monthLabel.replace(" ", "-")}.csv`;
-    const csvContent = buildCsvContent(sheetRows);
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-
-    // ── Use OS save dialog if supported (Chrome/Edge/WebView2) — same
-    // approach as fileService.ts's download()
-    if ("showSaveFilePicker" in window) {
-      try {
-        const fileHandle = await (window as any).showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }],
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      } catch (err: any) {
-        if (err.name === "AbortError") return; // user cancelled — no error
-        toast.error("Couldn't save the attendance sheet. Please try again.");
-        return;
-      }
-    }
-
-    // ── Fallback for engines without showSaveFilePicker — auto-downloads
-    // to the default folder, same as fileService.ts's fallback
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await downloadCsv(
+      filename,
+      buildCsv(SHEET_CSV_HEADER, sheetToCsvRows(sheetRows)),
+      "the attendance sheet",
+    );
   };
 
   // ── Render
