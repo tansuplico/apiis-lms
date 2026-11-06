@@ -1,11 +1,12 @@
 // src/pages/shared/AttendanceDetail.tsx
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Trash2, Filter } from "lucide-react";
 import { useCenterStore } from "@/stores/useCenterStore";
 import { useAttendanceStore } from "@/stores/useAttendanceStore";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import StudentAvatar from "@/components/shared/StudentAvatar";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { parseDateKey } from "@/utils/dateformatter";
 
@@ -20,6 +21,9 @@ export default function AttendanceDetail() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "present" | "absent"
+  >("all");
 
   const parts = (attendanceId ?? "").split("-");
   const centerId = parts[0];
@@ -80,6 +84,14 @@ export default function AttendanceDetail() {
   const absent = session.records.filter(
     (r: any) => r.status === "absent",
   ).length;
+
+  // ── Derived: rows shown in the table. Display only — stats above and
+  // handleDelete below deliberately keep using the unfiltered session.records.
+  // (Plain const, not useMemo: the early returns above would break hook order.)
+  const visibleRecords =
+    statusFilter === "all"
+      ? session.records
+      : session.records.filter((r: any) => r.status === statusFilter);
 
   // ── Handlers
   const handleDelete = async () => {
@@ -155,6 +167,29 @@ export default function AttendanceDetail() {
       </div>
 
       {/* Records */}
+      <div className="flex justify-end">
+        <FilterDropdown
+          value={statusFilter}
+          onChange={(v) => setStatusFilter(v as "all" | "present" | "absent")}
+          options={[
+            { value: "all", label: "All Students" },
+            { value: "present", label: "Present" },
+            { value: "absent", label: "Absent" },
+          ]}
+          icon={
+            <Filter
+              size={14}
+              className={
+                statusFilter !== "all"
+                  ? "text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }
+            />
+          }
+          active={statusFilter !== "all"}
+        />
+      </div>
+
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -171,7 +206,17 @@ export default function AttendanceDetail() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {session.records.map((record: any) => (
+            {visibleRecords.length === 0 && (
+              <tr>
+                <td
+                  colSpan={3}
+                  className="text-center py-12 text-gray-500 dark:text-gray-400"
+                >
+                  No {statusFilter} students on this date.
+                </td>
+              </tr>
+            )}
+            {visibleRecords.map((record: any) => (
               <tr
                 key={record.studentId}
                 className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
