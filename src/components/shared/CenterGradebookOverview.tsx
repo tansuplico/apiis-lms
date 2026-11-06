@@ -8,12 +8,10 @@ import {
   BookOpen,
   ChevronUp,
   ArrowUpDown,
-  Filter,
 } from "lucide-react";
 import { Course, CenterGradebookState } from "@/types/types";
 import { studentService } from "@/services/studentService";
 import { isOnline } from "@/services/networkStatus";
-import FilterDropdown from "./FilterDropdown";
 
 interface CenterGradebookOverviewProps {
   centerId: number;
@@ -41,9 +39,6 @@ export default function CenterGradebookOverview({
   type SortKey = "overall" | number;
   const [sortBy, setSortBy] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed">(
-    "all",
-  );
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
@@ -128,12 +123,6 @@ export default function CenterGradebookOverview({
     if (!gradebook) return [];
     let result = gradebook.students;
 
-    if (statusFilter !== "all") {
-      result = result.filter((s) =>
-        statusFilter === "passed" ? s.overallPassed : !s.overallPassed,
-      );
-    }
-
     if (sortBy) {
       const scoreOf = (s: (typeof result)[number]) =>
         sortBy === "overall"
@@ -152,7 +141,7 @@ export default function CenterGradebookOverview({
     }
 
     return result;
-  }, [gradebook, statusFilter, sortBy, sortDirection]);
+  }, [gradebook, sortBy, sortDirection]);
 
   // ── Guard: no courses assigned to this center
   if (courses.length === 0) {
@@ -198,29 +187,6 @@ export default function CenterGradebookOverview({
                 </button>
               </div>
             </div>
-
-            <FilterDropdown
-              value={statusFilter}
-              onChange={(v) =>
-                setStatusFilter(v as "all" | "passed" | "failed")
-              }
-              options={[
-                { value: "all", label: "All Statuses" },
-                { value: "passed", label: "Passed" },
-                { value: "failed", label: "Failed" },
-              ]}
-              icon={
-                <Filter
-                  size={14}
-                  className={
-                    statusFilter !== "all"
-                      ? "text-white"
-                      : "text-gray-500 dark:text-gray-400"
-                  }
-                />
-              }
-              active={statusFilter !== "all"}
-            />
           </div>
 
           <div className="relative">
@@ -369,7 +335,7 @@ export default function CenterGradebookOverview({
                         </button>
                       </th>
                     ))}
-                  <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-28 sticky right-28 z-10 bg-gray-50 dark:bg-gray-700/50 border-l border-gray-200 dark:border-gray-700">
+                  <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-28 sticky right-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-l border-gray-200 dark:border-gray-700">
                     <button
                       onClick={() => handleSort("overall")}
                       className="flex items-center justify-center gap-1 mx-auto hover:text-gray-900 dark:hover:text-white cursor-pointer"
@@ -378,19 +344,16 @@ export default function CenterGradebookOverview({
                       <SortIcon column="overall" />
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 text-center w-28 sticky right-0 z-10 bg-gray-50 dark:bg-gray-700/50">
-                    Status
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
                 {displayedStudents.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={pagedModuleNumbers.size + 3}
+                      colSpan={pagedModuleNumbers.size + 2}
                       className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
-                      No students match the selected filter.
+                      No students in this center.
                     </td>
                   </tr>
                 ) : (
@@ -431,27 +394,9 @@ export default function CenterGradebookOverview({
                           </td>
                         ))}
 
-                      <td className="px-4 py-4 text-center w-28 sticky right-28 z-10 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
-                        <span
-                          className={`font-semibold text-sm ${
-                            student.overallPassed
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
+                      <td className="px-4 py-4 text-center w-28 sticky right-0 z-10 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
+                        <span className="font-semibold text-sm text-gray-900 dark:text-white">
                           {student.overallScore}%
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-center w-28 sticky right-0 z-10 bg-white dark:bg-gray-800">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                            student.overallPassed
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          }`}
-                        >
-                          {student.overallPassed ? "Passed" : "Failed"}
                         </span>
                       </td>
                     </tr>

@@ -1,5 +1,4 @@
 // src/services/networkStatus.ts
-
 const HEALTH_URL = import.meta.env.VITE_API_URL
   ? `${(import.meta.env.VITE_API_URL as string).replace(/\/api$/, "")}/health`
   : "http://localhost:3000/health";

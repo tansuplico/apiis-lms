@@ -3,6 +3,9 @@ import { useEffect } from "react";
 
 export function useLockRefresh() {
   useEffect(() => {
+    // Dev needs reload + the context menu (Inspect) for debugging
+    if (import.meta.env.DEV) return;
+
     const onContextMenu = (e: MouseEvent) => e.preventDefault();
 
     const onKeyDown = (e: KeyboardEvent) => {
