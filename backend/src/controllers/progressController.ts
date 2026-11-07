@@ -41,18 +41,10 @@ function isAnswerCorrect(qd: any, studentAns: unknown): boolean {
     }
 
     case "matching": {
-      if (!Array.isArray(studentAns) || !Array.isArray(qd.matchingPairs)) {
-        return false;
-      }
-      if (studentAns.length !== qd.matchingPairs.length) return false;
-      // All-or-nothing per question, consistent with every other question type
-      // here being graded as a single correct/incorrect unit (no partial credit).
-      return qd.matchingPairs.every(
-        (pair: { left: string; right: string }, i: number) =>
-          typeof studentAns[i] === "string" &&
-          (studentAns[i] as string).trim().toLowerCase() ===
-            pair.right.trim().toLowerCase(),
-      );
+      // "Fully correct" = every pair matched. The score itself is points-based
+      // (see scoreAnswer below).
+      const { earned, possible } = scoreAnswer(qd, studentAns);
+      return possible > 0 && earned === possible;
     }
 
     case "fill_in_the_blank":
@@ -63,6 +55,35 @@ function isAnswerCorrect(qd: any, studentAns: unknown): boolean {
           qd.correctAnswer?.trim().toLowerCase()
       );
   }
+}
+
+// ── Points per question. Every question is worth 1 point, except matching:
+// 1 point PER PAIR with partial credit (a 5-pair matching question is worth 5
+// points). Every server-side score — both gradebooks, saveQuizAnswers' coins
+// and its keep-the-higher-score rule — goes through here; keep in sync with
+// scoreQuestion in src/pages/students/CourseQuiz.tsx.
+function scoreAnswer(
+  qd: any,
+  studentAns: unknown,
+): { earned: number; possible: number } {
+  if ((qd.type ?? "multiple_choice") !== "matching") {
+    return { earned: isAnswerCorrect(qd, studentAns) ? 1 : 0, possible: 1 };
+  }
+
+  const pairs: { left: string; right: string }[] = Array.isArray(
+    qd.matchingPairs,
+  )
+    ? qd.matchingPairs
+    : [];
+  const given: unknown[] = Array.isArray(studentAns) ? studentAns : [];
+  const earned = pairs.filter(
+    (pair, i) =>
+      typeof given[i] === "string" &&
+      (given[i] as string).trim().toLowerCase() ===
+        pair.right.trim().toLowerCase(),
+  ).length;
+
+  return { earned, possible: pairs.length };
 }
 
 interface GradebookModule {
@@ -146,6 +167,12 @@ function buildStudentGradebook(
 
     const questions = questionsByPartId.get(quizPartId) ?? [];
     const numQuestions = questions.length;
+    // totalQuestions / correctAnswers in the response now carry POINTS (see
+    // scoreAnswer): identical to question counts unless a quiz has matching.
+    const maxPoints = questions.reduce(
+      (sum, q) => sum + scoreAnswer(q.question_data, undefined).possible,
+      0,
+    );
 
     if (numQuestions === 0) {
       gradebook.push({
@@ -175,14 +202,14 @@ function buildStudentGradebook(
         moduleWeight: module.weight ?? null,
         hasQuiz: true,
         attempted: false,
-        totalQuestions: numQuestions,
+        totalQuestions: maxPoints,
         correctAnswers: 0,
         score: 0,
         passed: false,
         coinsAwarded: 0,
         submittedAt: null,
       });
-      totalQuestions += numQuestions;
+      totalQuestions += maxPoints;
       continue;
     }
 
@@ -192,13 +219,13 @@ function buildStudentGradebook(
     questions.forEach((q) => {
       const qd = q.question_data;
       const studentAns = studentAnswers[String(q.id)];
-      if (isAnswerCorrect(qd, studentAns)) correct++;
+      correct += scoreAnswer(qd, studentAns).earned;
     });
 
-    const score = Math.round((correct / numQuestions) * 100);
+    const score = maxPoints > 0 ? Math.round((correct / maxPoints) * 100) : 0;
     const passed = score >= 75;
 
-    totalQuestions += numQuestions;
+    totalQuestions += maxPoints;
     totalCorrect += correct;
 
     gradebook.push({
@@ -207,7 +234,7 @@ function buildStudentGradebook(
       moduleWeight: module.weight ?? null,
       hasQuiz: true,
       attempted: true,
-      totalQuestions: numQuestions,
+      totalQuestions: maxPoints,
       correctAnswers: correct,
       score,
       passed,
@@ -719,15 +746,18 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
 
       questions = questionsResult.rows;
 
+      let possiblePoints = 0;
       questions.forEach((q) => {
         const qd = q.question_data;
         const studentAns = answers[String(q.id)];
-        if (isAnswerCorrect(qd, studentAns)) correct++;
+        const result = scoreAnswer(qd, studentAns);
+        correct += result.earned;
+        possiblePoints += result.possible;
       });
 
       coinsToAward =
-        questions.length > 0
-          ? Math.round((correct / questions.length) * difficultyCoins)
+        possiblePoints > 0
+          ? Math.round((correct / possiblePoints) * difficultyCoins)
           : 0;
     }
 
@@ -755,7 +785,7 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
         questions.forEach((q) => {
           const qd = q.question_data;
           const prevAns = previousAnswers[String(q.id)];
-          if (isAnswerCorrect(qd, prevAns)) previousCorrect++;
+          previousCorrect += scoreAnswer(qd, prevAns).earned;
         });
         if (correct < previousCorrect) {
           answersToStore = previousAnswers;

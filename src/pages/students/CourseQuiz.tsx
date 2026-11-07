@@ -83,6 +83,46 @@ function isQuestionCorrect(q: QuizQuestion, answer: StudentAnswer): boolean {
   }
 }
 
+// Points per question: 1, except matching = 1 per pair with partial credit.
+// Mirrors scoreAnswer in the backend's progressController.ts — keep both in
+// sync. isQuestionCorrect above stays the "fully correct?" check used for
+// the per-question feedback.
+function scoreQuestion(
+  q: QuizQuestion,
+  answer: StudentAnswer,
+): { earned: number; possible: number } {
+  if ((q.type ?? "multiple_choice") !== "matching") {
+    return { earned: isQuestionCorrect(q, answer) ? 1 : 0, possible: 1 };
+  }
+
+  const pairs = q.matchingPairs ?? [];
+  const given = Array.isArray(answer) ? answer : [];
+  const earned = pairs.filter(
+    (pair, i) =>
+      typeof given[i] === "string" &&
+      (given[i] as string).trim().toLowerCase() ===
+        pair.right.trim().toLowerCase(),
+  ).length;
+
+  return { earned, possible: pairs.length };
+}
+
+function scoreQuiz(
+  questions: QuizQuestion[],
+  answerFor: (q: QuizQuestion) => StudentAnswer,
+): { earned: number; possible: number } {
+  return questions.reduce(
+    (total, q) => {
+      const result = scoreQuestion(q, answerFor(q));
+      return {
+        earned: total.earned + result.earned,
+        possible: total.possible + result.possible,
+      };
+    },
+    { earned: 0, possible: 0 },
+  );
+}
+
 export default function CourseQuiz() {
   // ── Store & hooks
   const { course } = useOutletContext<{ course: Course }>();
@@ -153,14 +193,18 @@ export default function CourseQuiz() {
   const savedAnswers =
     currentStudent?.courseProgress?.[course.id]?.quizAnswers?.[modNum] ?? {};
 
-  const restoredScore = questions.filter((q) =>
-    isQuestionCorrect(q, savedAnswers[q.id] as StudentAnswer),
-  ).length;
+  // Total points available in this quiz (matching = 1 per pair).
+  const totalPoints = scoreQuiz(questions, () => undefined).possible;
+
+  const restoredScore = scoreQuiz(
+    questions,
+    (q) => savedAnswers[q.id] as StudentAnswer,
+  ).earned;
 
   const restoredCoins = (() => {
-    if (!alreadyCompletedQuiz || questions.length === 0) return 0;
+    if (!alreadyCompletedQuiz || totalPoints === 0) return 0;
     const coins = COIN_REWARDS_BY_DIFFICULTY[course.level] ?? 5;
-    return Math.round((restoredScore / questions.length) * coins);
+    return Math.round((restoredScore / totalPoints) * coins);
   })();
 
   // ── State
@@ -190,7 +234,7 @@ export default function CourseQuiz() {
       return typeof answer !== "undefined" && answer !== "";
     });
   const percentage =
-    questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
+    totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
 
   // ── Guards
   if (!currentModule || !quizPart) {
@@ -214,12 +258,14 @@ export default function CourseQuiz() {
   };
 
   const handleSubmit = async () => {
-    const correctCount = questions.filter((q) =>
-      isQuestionCorrect(q, studentAnswers[q.id]),
-    ).length;
+    const correctCount = scoreQuiz(
+      questions,
+      (q) => studentAnswers[q.id],
+    ).earned;
 
     const coins = COIN_REWARDS_BY_DIFFICULTY[course.level] ?? 5;
-    const earned = Math.round((correctCount / questions.length) * coins);
+    const earned =
+      totalPoints > 0 ? Math.round((correctCount / totalPoints) * coins) : 0;
 
     setScore(correctCount);
     setSubmitted(true);
@@ -233,7 +279,7 @@ export default function CourseQuiz() {
       setEarnedCoins(0);
       await saveQuizAnswers(course.id, modNum, studentAnswers);
       toast.info(
-        `Quiz retaken! You scored ${correctCount}/${questions.length}. No additional coins awarded.`,
+        `Quiz retaken! You scored ${correctCount}/${totalPoints} points. No additional coins awarded.`,
       );
     }
   };
@@ -645,7 +691,7 @@ export default function CourseQuiz() {
                 <Trophy size={40} className="mx-auto text-amber-500" />
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {score} / {questions.length}
+                    {score} / {totalPoints} points
                   </p>
                   <p className="text-gray-500 dark:text-gray-400 mt-1">
                     {percentage}% correct
