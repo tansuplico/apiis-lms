@@ -1,4 +1,4 @@
-// src/pages/students/CourseQuiz.tsx
+// src/pages/admins/CourseQuiz.tsx
 import { useParams, useOutletContext } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -409,7 +409,7 @@ export default function CourseQuiz({
         return "Fill in both sides of every matching pair.";
     } else if (questionDraft.type === "fill_in_the_blank") {
       if (!questionDraft.correctAnswer?.trim())
-        return "Enter the correct answer."; 
+        return "Enter the correct answer.";
       const blankCount = questionDraft.question.split("___").length - 1;
       if (blankCount === 0)
         return 'Use "___" in the question text to mark the blank.';

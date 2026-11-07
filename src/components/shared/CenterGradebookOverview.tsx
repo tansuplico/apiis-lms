@@ -8,13 +8,16 @@ import {
   BookOpen,
   ChevronUp,
   ArrowUpDown,
+  Download,
 } from "lucide-react";
 import { Course, CenterGradebookState } from "@/types/types";
 import { studentService } from "@/services/studentService";
 import { isOnline } from "@/services/networkStatus";
+import { buildCsv, downloadCsv, toFilenamePart } from "@/utils/csvExport";
 
 interface CenterGradebookOverviewProps {
   centerId: number;
+  centerName?: string;
   courses: Course[];
 }
 
@@ -22,6 +25,7 @@ const MODULES_PER_PAGE = 10;
 
 export default function CenterGradebookOverview({
   centerId,
+  centerName,
   courses,
 }: CenterGradebookOverviewProps) {
   // ── State
@@ -143,6 +147,41 @@ export default function CenterGradebookOverview({
     return result;
   }, [gradebook, sortBy, sortDirection]);
 
+  // ── Handlers: export. Covers ALL modules (not just the visible page) in the
+  // same row order as the table. Scores go out as plain percentages — raw
+  // "3/5" text would be turned into a date by Excel.
+  const handleExportCsv = async () => {
+    if (!gradebook) return;
+
+    const header = [
+      "Student",
+      "ID",
+      ...gradebook.modules.map(
+        (m) =>
+          `Q${m.moduleNumber} ${m.moduleTitle} (${
+            m.moduleWeight !== null ? `${m.moduleWeight}%` : "even split"
+          })`,
+      ),
+      "Overall (%)",
+    ];
+
+    const rows = displayedStudents.map((s) => [
+      `${s.firstName} ${s.lastName}`,
+      s.idNumber,
+      ...gradebook.modules.map((m) => {
+        const result = s.modules.find((r) => r.moduleNumber === m.moduleNumber);
+        if (!result || !result.hasQuiz) return "No quiz";
+        return result.attempted ? (result.score ?? "") : "Not taken";
+      }),
+      s.overallScore,
+    ]);
+
+    const filename = `${toFilenamePart(centerName ?? `center-${centerId}`)}_${toFilenamePart(
+      selectedCourse?.title ?? "course",
+    )}_gradebook.csv`;
+    await downloadCsv(filename, buildCsv(header, rows), "the gradebook");
+  };
+
   // ── Guard: no courses assigned to this center
   if (courses.length === 0) {
     return (
@@ -186,6 +225,18 @@ export default function CenterGradebookOverview({
                   Raw Score
                 </button>
               </div>
+
+              <button
+                onClick={handleExportCsv}
+                disabled={
+                  isLoading || !!loadError || displayedStudents.length === 0
+                }
+                title="Export the gradebook to CSV"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-sm font-medium whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Download size={14} />
+                Export CSV
+              </button>
             </div>
           </div>
 

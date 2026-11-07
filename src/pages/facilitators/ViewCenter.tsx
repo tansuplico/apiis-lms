@@ -297,6 +297,7 @@ export default function ViewCenter() {
       {activeTab === "gradebook" && (
         <CenterGradebookOverview
           centerId={currentCenter.id}
+          centerName={centerTitle}
           courses={centerCourses}
         />
       )}
