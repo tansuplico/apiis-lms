@@ -104,6 +104,41 @@ export default function CourseQuiz() {
     [quizPart?.id, shuffleSeed],
   );
 
+  // ── Per-attempt option order. DISPLAY-ONLY: answers are still recorded
+  // against the ORIGINAL position (multiple choice: index into q.options;
+  // matching: the pair's right-hand text), so client scoring
+  // (isQuestionCorrect), the server's isAnswerCorrect, saved answers and the
+  // offline cache all keep working unchanged. Re-shuffled on every retake.
+  const shuffledOptions = useMemo(() => {
+    const multipleChoice = new Map<
+      number,
+      { text: string; originalIndex: number }[]
+    >();
+    const matching = new Map<number, string[]>();
+
+    for (const q of questions) {
+      if (q.type === "matching") {
+        matching.set(
+          q.id,
+          shuffleArray((q.matchingPairs ?? []).map((pair) => pair.right)),
+        );
+      } else if ((q.type ?? "multiple_choice") === "multiple_choice") {
+        multipleChoice.set(
+          q.id,
+          shuffleArray(
+            (q.options ?? []).map((text, originalIndex) => ({
+              text,
+              originalIndex,
+            })),
+          ),
+        );
+      }
+    }
+
+    return { multipleChoice, matching };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizPart?.id, shuffleSeed]);
+
   const alreadyCompleted =
     currentStudent?.courseProgress?.[course.id]?.completedParts.includes(
       `${modNum}:${currentPartSlug ?? ""}`,
@@ -289,63 +324,68 @@ export default function CourseQuiz() {
                   {/* Multiple Choice */}
                   {type === "multiple_choice" && (
                     <ul className="space-y-2">
-                      {q.options?.map((opt, optIdx) => {
-                        const isSelected = studentAnswer === optIdx;
-                        const isCorrectOption = optIdx === q.correctOptionIndex;
-                        const showAsCorrect =
-                          submitted &&
-                          ((revealAnswers && isCorrectOption) ||
-                            (isSelected && isCorrectOption));
-                        const showAsWrongSelected =
-                          submitted && isSelected && !isCorrectOption;
+                      {(shuffledOptions.multipleChoice.get(q.id) ?? []).map(
+                        ({ text: opt, originalIndex: optIdx }) => {
+                          const isSelected = studentAnswer === optIdx;
+                          const isCorrectOption =
+                            optIdx === q.correctOptionIndex;
+                          const showAsCorrect =
+                            submitted &&
+                            ((revealAnswers && isCorrectOption) ||
+                              (isSelected && isCorrectOption));
+                          const showAsWrongSelected =
+                            submitted && isSelected && !isCorrectOption;
 
-                        let optionStyle =
-                          "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
-                        if (showAsCorrect) {
-                          optionStyle =
-                            "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
-                        } else if (showAsWrongSelected) {
-                          optionStyle =
-                            "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
-                        } else if (!submitted && isSelected) {
-                          optionStyle =
-                            "border-blue-500 bg-blue-50 dark:bg-blue-900/30";
-                        }
+                          let optionStyle =
+                            "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
+                          if (showAsCorrect) {
+                            optionStyle =
+                              "border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200";
+                          } else if (showAsWrongSelected) {
+                            optionStyle =
+                              "border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200";
+                          } else if (!submitted && isSelected) {
+                            optionStyle =
+                              "border-blue-500 bg-blue-50 dark:bg-blue-900/30";
+                          }
 
-                        return (
-                          <li
-                            key={optIdx}
-                            onClick={() => handleAnswerSelect(q.id, optIdx)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${optionStyle} ${
-                              !submitted
-                                ? "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                : ""
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`q${q.id}`}
-                              checked={isSelected}
-                              onChange={() => handleAnswerSelect(q.id, optIdx)}
-                              className="text-blue-600 dark:text-blue-400 focus:ring-blue-500"
-                              disabled={submitted}
-                            />
-                            <span className="flex-1 text-sm">{opt}</span>
-                            {showAsCorrect && (
-                              <CheckCircle
-                                size={18}
-                                className="text-green-500 shrink-0"
+                          return (
+                            <li
+                              key={optIdx}
+                              onClick={() => handleAnswerSelect(q.id, optIdx)}
+                              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${optionStyle} ${
+                                !submitted
+                                  ? "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  : ""
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`q${q.id}`}
+                                checked={isSelected}
+                                onChange={() =>
+                                  handleAnswerSelect(q.id, optIdx)
+                                }
+                                className="text-blue-600 dark:text-blue-400 focus:ring-blue-500"
+                                disabled={submitted}
                               />
-                            )}
-                            {showAsWrongSelected && (
-                              <XCircle
-                                size={18}
-                                className="text-red-500 shrink-0"
-                              />
-                            )}
-                          </li>
-                        );
-                      })}
+                              <span className="flex-1 text-sm">{opt}</span>
+                              {showAsCorrect && (
+                                <CheckCircle
+                                  size={18}
+                                  className="text-green-500 shrink-0"
+                                />
+                              )}
+                              {showAsWrongSelected && (
+                                <XCircle
+                                  size={18}
+                                  className="text-red-500 shrink-0"
+                                />
+                              )}
+                            </li>
+                          );
+                        },
+                      )}
                     </ul>
                   )}
 
@@ -487,11 +527,13 @@ export default function CourseQuiz() {
                               }`}
                             >
                               <option value="">Select a match...</option>
-                              {(q.matchingPairs ?? []).map((p, i) => (
-                                <option key={i} value={p.right}>
-                                  {p.right}
-                                </option>
-                              ))}
+                              {(shuffledOptions.matching.get(q.id) ?? []).map(
+                                (right, i) => (
+                                  <option key={i} value={right}>
+                                    {right}
+                                  </option>
+                                ),
+                              )}
                             </select>
                             {submitted &&
                               (pairCorrect ? (
