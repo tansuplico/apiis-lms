@@ -9,6 +9,7 @@ import {
   addModule,
   updateModule,
   deleteModule,
+  setModuleWeights,
   addPart,
   updatePart,
   deletePart,
@@ -50,6 +51,13 @@ router.post(
   authenticate,
   authorize("admin", "facilitator"),
   addModule,
+);
+// Must come before "/:id/modules/:moduleId", or "weights" is read as a module id.
+router.put(
+  "/:id/modules/weights",
+  authenticate,
+  authorize("admin", "facilitator"),
+  setModuleWeights,
 );
 router.put(
   "/:id/modules/:moduleId",

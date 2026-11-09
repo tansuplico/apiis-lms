@@ -1,10 +1,13 @@
 // src/components/shared/PreviewContents.tsx
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Scale, Trash2 } from "lucide-react";
+import { toast } from "react-toastify";
 import { Course, CourseModule } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
+import WeightModal from "@/components/admins/courses/WeightModal";
+import { buildModuleWeightsPayload } from "@/utils/moduleWeights";
 
 interface PreviewContentsProps {
   course: Course;
@@ -25,13 +28,26 @@ export default function PreviewContents({
   onModulesPersisted,
 }: PreviewContentsProps) {
   // ── Store
-  const { addModule, deleteModule } = useCourseStore();
+  const { addModule, deleteModule, setModuleWeights } = useCourseStore();
   const online = useOnlineStatus();
   const [isAddingModule, setIsAddingModule] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<CourseModule | null>(
     null,
   );
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showWeightModal, setShowWeightModal] = useState(false);
+
+  // Memoised: WeightModal re-initialises its inputs whenever this array changes.
+  const weightModules = useMemo(
+    () =>
+      course.modules.map((m) => ({
+        id: m.id,
+        number: m.number,
+        title: m.title,
+        weight: m.weight,
+      })),
+    [course.modules],
+  );
 
   // ── State
   const [editingModuleIndex, setEditingModuleIndex] = useState<number | null>(
@@ -92,6 +108,23 @@ export default function PreviewContents({
       setIsDeleting(false);
       setModuleToDelete(null);
     }
+  };
+
+  // Saves every module's weight in one request, so it's applied to both the
+  // working copy and the Cancel snapshot via the parent.
+  const handleSaveWeights = async (weights: Record<number, string>) => {
+    const payload = buildModuleWeightsPayload(course.modules, weights);
+    await setModuleWeights(course.id, payload);
+
+    const weightById = new Map(payload.map((p) => [p.moduleId, p.weight]));
+    onModulesPersisted?.((modules) =>
+      modules.map((m) =>
+        weightById.has(m.id)
+          ? { ...m, weight: weightById.get(m.id) ?? null }
+          : m,
+      ),
+    );
+    toast.success("Module weights saved.", { position: "bottom-right" });
   };
 
   // ── Render
@@ -198,12 +231,28 @@ export default function PreviewContents({
             <Plus size={18} />
             {isAddingModule ? "Adding..." : "Add New Module"}
           </button>
+          <button
+            onClick={() => setShowWeightModal(true)}
+            disabled={!online || course.modules.length === 0}
+            title={!online ? "You're offline" : undefined}
+            className="mt-3 w-full py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Scale size={18} />
+            Set Module Weights
+          </button>
           <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
-            Adding or deleting a module takes effect immediately. Cancel won't
-            undo it.
+            Adding, deleting or weighting modules takes effect immediately.
+            Cancel won't undo it.
           </p>
         </div>
       )}
+
+      <WeightModal
+        isOpen={showWeightModal}
+        onClose={() => setShowWeightModal(false)}
+        modules={weightModules}
+        onSave={handleSaveWeights}
+      />
 
       {moduleToDelete && (
         <DeleteConfirmModal

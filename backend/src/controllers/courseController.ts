@@ -15,6 +15,8 @@ const MAX_QUIZ_QUESTIONS = 50;
 const MAX_QUIZ_OPTIONS = 6;
 const MAX_MATCHING_PAIRS = 6;
 const MAX_IDENTIFICATION_ANSWERS = 10;
+// Slack for rounded decimals (e.g. 33.33 x 3); mirrors WeightModal's 0.01 check.
+const WEIGHT_SUM_TOLERANCE = 0.011;
 // Question images are embedded as base64 data URIs (same pattern as course
 // content images), not just http(s)/api URLs — hence the separate regex.
 const QUESTION_IMAGE_REGEX =
@@ -1129,6 +1131,126 @@ export const deleteModule = async (req: Request, res: Response) => {
       .json({ success: true, message: "Module deleted successfully." });
   } catch (err) {
     console.error("deleteModule error:", err);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+// ── Set Module Weights (every module of the course, all-or-nothing)
+export const setModuleWeights = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const { id } = req.params;
+    const { weights } = req.body;
+
+    if (isNaN(Number(id))) {
+      res.status(400).json({ success: false, message: "Invalid ID." });
+      return;
+    }
+
+    if (!Array.isArray(weights)) {
+      res
+        .status(400)
+        .json({ success: false, message: "Weights are required." });
+      return;
+    }
+
+    const modules = await pool.query(
+      `SELECT id FROM course_modules WHERE course_id = $1`,
+      [id],
+    );
+
+    if (modules.rows.length === 0) {
+      res
+        .status(404)
+        .json({ success: false, message: "Course has no modules." });
+      return;
+    }
+
+    if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
+
+    const courseModuleIds = new Set<number>(
+      modules.rows.map((row: { id: number }) => Number(row.id)),
+    );
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    const values: (number | null)[] = [];
+    let explicitSum = 0;
+    let blankCount = 0;
+
+    for (const entry of weights) {
+      const moduleId = Number(entry?.moduleId);
+      if (
+        !Number.isInteger(moduleId) ||
+        !courseModuleIds.has(moduleId) ||
+        seen.has(moduleId)
+      ) {
+        res
+          .status(400)
+          .json({ success: false, message: "Invalid module list." });
+        return;
+      }
+      seen.add(moduleId);
+
+      const weight = entry.weight;
+      if (weight === null) {
+        blankCount++;
+      } else if (
+        typeof weight !== "number" ||
+        !Number.isFinite(weight) ||
+        weight < 0 ||
+        weight > 100
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Each weight must be a number between 0 and 100.",
+        });
+        return;
+      } else {
+        explicitSum += weight;
+      }
+
+      ids.push(moduleId);
+      values.push(weight);
+    }
+
+    if (seen.size !== courseModuleIds.size) {
+      res.status(400).json({
+        success: false,
+        message: "Weights must be provided for every module.",
+      });
+      return;
+    }
+
+    if (explicitSum > 100 + WEIGHT_SUM_TOLERANCE) {
+      res.status(400).json({ success: false, message: "Weights exceed 100%." });
+      return;
+    }
+
+    if (
+      blankCount === 0 &&
+      Math.abs(explicitSum - 100) > WEIGHT_SUM_TOLERANCE
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Weights must sum to exactly 100%.",
+      });
+      return;
+    }
+
+    // One statement, so either every module gets its weight or none does.
+    await pool.query(
+      `UPDATE course_modules AS m
+       SET weight = v.weight
+       FROM (
+         SELECT UNNEST($2::int[]) AS id, UNNEST($3::numeric[]) AS weight
+       ) AS v
+       WHERE m.id = v.id AND m.course_id = $1`,
+      [id, ids, values],
+    );
+
+    res.status(200).json({ success: true, message: "Module weights saved." });
+  } catch (err) {
+    console.error("setModuleWeights error:", err);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };

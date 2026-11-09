@@ -1,5 +1,6 @@
 import { apiClient } from "./apiClient";
 import { Course, CourseModule, CoursePart, QuizQuestion } from "@/types/types";
+import type { ModuleWeightEntry } from "@/utils/moduleWeights";
 
 interface CoursePayload {
   title?: string;
@@ -63,6 +64,13 @@ export const courseService = {
     data: { title?: string; weight?: number | null },
   ): Promise<void> => {
     await apiClient.put(`/courses/${courseId}/modules/${moduleId}`, data);
+  },
+
+  setModuleWeights: async (
+    courseId: number,
+    weights: ModuleWeightEntry[],
+  ): Promise<void> => {
+    await apiClient.put(`/courses/${courseId}/modules/weights`, { weights });
   },
 
   deleteModule: async (courseId: number, moduleId: number): Promise<void> => {

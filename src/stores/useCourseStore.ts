@@ -9,6 +9,7 @@ import {
   QuizQuestion,
 } from "@/types/types";
 import { courseService } from "@/services/courseService";
+import type { ModuleWeightEntry } from "@/utils/moduleWeights";
 import { toast } from "react-toastify";
 import { getLocalCourses } from "@/services/syncService";
 import { isOnline } from "@/services/networkStatus";
@@ -33,6 +34,10 @@ interface CourseStore {
     courseId: number,
     moduleId: number,
     data: { title?: string; weight?: number | null },
+  ) => Promise<void>;
+  setModuleWeights: (
+    courseId: number,
+    weights: ModuleWeightEntry[],
   ) => Promise<void>;
   deleteModule: (courseId: number, moduleId: number) => Promise<void>;
   addPart: (
@@ -227,6 +232,32 @@ export const useCourseStore = create<CourseStore>()((set, get) => ({
       }));
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update module.");
+      throw err;
+    }
+  },
+
+  // Saves the weight of every module in one request (all-or-nothing).
+  setModuleWeights: async (courseId, weights) => {
+    try {
+      await courseService.setModuleWeights(courseId, weights);
+
+      const weightById = new Map(weights.map((w) => [w.moduleId, w.weight]));
+      set((state) => ({
+        courses: state.courses.map((c) =>
+          c.id === courseId
+            ? {
+                ...c,
+                modules: c.modules.map((m) =>
+                  weightById.has(m.id)
+                    ? { ...m, weight: weightById.get(m.id) ?? null }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      }));
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to save module weights.");
       throw err;
     }
   },
