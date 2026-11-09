@@ -19,6 +19,7 @@ import { useCourseStore } from "@/stores/useCourseStore";
 import { useSubmissionStore } from "@/stores/useSubmissionStore";
 import { toast } from "react-toastify";
 import WeightModal from "@/components/admins/courses/WeightModal";
+import { buildModuleWeightsPayload } from "@/utils/moduleWeights";
 import VideoPreviewModal from "@/components/admins/courses/VideoPreviewModal";
 import AddPartModal from "@/components/admins/courses/AddPartModal";
 import { fileService } from "@/services/fileService";
@@ -45,6 +46,7 @@ export default function FacilitatorCourseLayout() {
     updatePart: storeUpdatePart,
     deletePart: storeDeletePart,
     updateModule: storeUpdateModule,
+    setModuleWeights: storeSetModuleWeights,
     uploadVideo: storeUploadVideo,
     deleteVideo: storeDeleteVideo,
     uploadFile: storeUploadFile,
@@ -236,28 +238,12 @@ export default function FacilitatorCourseLayout() {
 
   // ── Handlers: module weights
   const saveWeights = async (weights: Record<number, string>) => {
-    const explicitEntries = course.modules.filter(
-      (mod) => weights[mod.number]?.trim() !== "",
+    // One request for every module, so a failure can't leave a mix of old and
+    // new weights. The server validates the total.
+    await storeSetModuleWeights(
+      course.id,
+      buildModuleWeightsPayload(course.modules, weights),
     );
-    const blankEntries = course.modules.filter(
-      (mod) => weights[mod.number]?.trim() === "",
-    );
-
-    const explicitValues = explicitEntries.map((mod) =>
-      parseFloat(weights[mod.number]),
-    );
-    const explicitSum = explicitValues.reduce((a, b) => a + b, 0);
-    const remaining = 100 - explicitSum;
-    const equalShare =
-      blankEntries.length > 0 && remaining > 0
-        ? parseFloat((remaining / blankEntries.length).toFixed(2))
-        : 0;
-
-    for (const mod of course.modules) {
-      const isBlank = weights[mod.number]?.trim() === "";
-      const weight = isBlank ? equalShare : parseFloat(weights[mod.number]);
-      await storeUpdateModule(course.id, mod.id, { weight });
-    }
 
     toast.success("Module weights saved.", { position: "bottom-right" });
   };

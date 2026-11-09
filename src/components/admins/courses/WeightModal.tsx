@@ -31,7 +31,10 @@ export default function WeightModal({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // ── Effects: initialise weights on open
+  // ── Effects: initialise weights when the modal opens
+  // Keyed on isOpen only. Parents often pass a freshly built `modules` array on
+  // every render, so depending on it here would wipe what the user has typed
+  // whenever the parent re-renders while the modal is open.
   useEffect(() => {
     if (isOpen) {
       const initial: Record<number, string> = {};
@@ -41,7 +44,7 @@ export default function WeightModal({
       setWeights(initial);
       setError(null);
     }
-  }, [isOpen, modules]);
+  }, [isOpen]);
 
   // ── Derived: weight sums & helpers
   const explicitSum = useMemo(() => {
