@@ -1048,7 +1048,7 @@ export const deleteModule = async (req: Request, res: Response) => {
     }
 
     const existing = await pool.query(
-      `SELECT id FROM course_modules WHERE id = $1 AND course_id = $2`,
+      `SELECT id, number FROM course_modules WHERE id = $1 AND course_id = $2`,
       [moduleId, id],
     );
 
@@ -1059,30 +1059,69 @@ export const deleteModule = async (req: Request, res: Response) => {
 
     if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
 
+    const moduleNumber: number = existing.rows[0].number;
+
     const client = await pool.connect();
+    let affectedStudents = 0;
     try {
       await client.query("BEGIN");
 
-      await client.query(`DELETE FROM course_modules WHERE id = $1`, [
-        moduleId,
-      ]);
-
-      await client.query(
-        `WITH numbered AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY number) AS new_number
-          FROM course_modules WHERE course_id = $1
-        )
-        UPDATE course_modules SET number = numbered.new_number
-        FROM numbered WHERE course_modules.id = numbered.id`,
-        [id],
+      // Student progress and quiz answers are keyed by module NUMBER, and
+      // deleting a module renumbers every module after it. So refuse if any
+      // student has data on this module or on a later one. Submissions are
+      // keyed by module id, so only this module's submissions matter.
+      const affected = await client.query(
+        `SELECT COUNT(*)::int AS count FROM (
+           SELECT student_id FROM student_completed_parts
+           WHERE course_id = $1 AND module_number >= $2
+           UNION
+           SELECT student_id FROM student_quiz_answers
+           WHERE course_id = $1 AND module_number >= $2
+           UNION
+           SELECT student_id FROM student_submissions
+           WHERE module_id = $3
+         ) AS affected_students`,
+        [id, moduleNumber, moduleId],
       );
+      affectedStudents = affected.rows[0].count;
 
-      await client.query("COMMIT");
+      if (affectedStudents > 0) {
+        await client.query("ROLLBACK");
+      } else {
+        await client.query(`DELETE FROM course_modules WHERE id = $1`, [
+          moduleId,
+        ]);
+
+        await client.query(
+          `WITH numbered AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY number) AS new_number
+            FROM course_modules WHERE course_id = $1
+          )
+          UPDATE course_modules SET number = numbered.new_number
+          FROM numbered WHERE course_modules.id = numbered.id`,
+          [id],
+        );
+
+        await client.query("COMMIT");
+      }
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
     } finally {
       client.release();
+    }
+
+    if (affectedStudents > 0) {
+      res.status(409).json({
+        success: false,
+        message: `This module can't be deleted because ${affectedStudents} ${
+          affectedStudents === 1
+            ? "student already has"
+            : "students already have"
+        } progress on it or on a later module.`,
+        affectedStudents,
+      });
+      return;
     }
 
     res

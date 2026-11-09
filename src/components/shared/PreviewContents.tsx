@@ -1,9 +1,10 @@
 // src/components/shared/PreviewContents.tsx
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Course, CourseModule } from "@/types/types";
 import { useCourseStore } from "@/stores/useCourseStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 
 interface PreviewContentsProps {
   course: Course;
@@ -24,9 +25,13 @@ export default function PreviewContents({
   onModulesPersisted,
 }: PreviewContentsProps) {
   // ── Store
-  const { addModule } = useCourseStore();
+  const { addModule, deleteModule } = useCourseStore();
   const online = useOnlineStatus();
   const [isAddingModule, setIsAddingModule] = useState(false);
+  const [moduleToDelete, setModuleToDelete] = useState<CourseModule | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ── State
   const [editingModuleIndex, setEditingModuleIndex] = useState<number | null>(
@@ -62,6 +67,30 @@ export default function PreviewContents({
       // error toast handled by the store
     } finally {
       setIsAddingModule(false);
+    }
+  };
+
+  // Hits the server immediately, so it's applied to both the working copy and
+  // the Cancel snapshot via the parent. The server refuses (409) when students
+  // have progress on this module or a later one; the store shows that message.
+  const handleDeleteModule = async () => {
+    if (!moduleToDelete || isDeleting) return;
+    const target = moduleToDelete;
+    setIsDeleting(true);
+    try {
+      await deleteModule(course.id, target.id);
+      // Mirror the server's renumbering of the remaining modules.
+      onModulesPersisted?.((modules) =>
+        modules
+          .filter((m) => m.id !== target.id)
+          .map((m, index) => ({ ...m, number: index + 1 })),
+      );
+      setEditingModuleIndex(null);
+    } catch {
+      // error toast handled by the store
+    } finally {
+      setIsDeleting(false);
+      setModuleToDelete(null);
     }
   };
 
@@ -120,6 +149,18 @@ export default function PreviewContents({
                   )}
                 </h2>
               )}
+
+              {isEditing && (
+                <button
+                  onClick={() => setModuleToDelete(module)}
+                  disabled={!online}
+                  title={!online ? "You're offline" : "Delete module"}
+                  aria-label={`Delete module ${module.number}`}
+                  className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
 
             {/* Parts List */}
@@ -158,9 +199,21 @@ export default function PreviewContents({
             {isAddingModule ? "Adding..." : "Add New Module"}
           </button>
           <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
-            New modules are created immediately. Cancel won't remove them.
+            Adding or deleting a module takes effect immediately. Cancel won't
+            undo it.
           </p>
         </div>
+      )}
+
+      {moduleToDelete && (
+        <DeleteConfirmModal
+          title="Delete Module?"
+          message="This will permanently delete the module and all its parts. Modules that students already have progress on can't be deleted. This action cannot be undone."
+          itemName={moduleToDelete.title}
+          onConfirm={handleDeleteModule}
+          onCancel={() => setModuleToDelete(null)}
+          isDeleting={isDeleting}
+        />
       )}
     </section>
   );
