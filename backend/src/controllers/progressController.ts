@@ -1,4 +1,4 @@
-// src/controllers/studentController.ts
+// src/controllers/progressController.ts
 import { Request, Response } from "express";
 import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
@@ -6,6 +6,8 @@ import { AuthRequest } from "../middleware/auth";
 // ── Constants
 const SLUG_REGEX = /^[a-z0-9-]+$/;
 const MAX_ANSWERS_COUNT = 50; // ← match MAX_QUIZ_QUESTIONS from courseController
+const MAX_MATCHING_ANSWERS = 6; // ← match MAX_MATCHING_PAIRS from courseController
+const MAX_ANSWER_TEXT_LENGTH = 500;
 
 // ── Quiz grading (shared by saveQuizAnswers and the gradebook batch query below —
 // keep both call sites in sync when adding a new question type)
@@ -687,7 +689,28 @@ export const saveQuizAnswers = async (req: AuthRequest, res: Response) => {
           return;
         }
       } else if (typeof value === "string") {
-        if (value.length > 500) {
+        if (value.length > MAX_ANSWER_TEXT_LENGTH) {
+          res
+            .status(400)
+            .json({ success: false, message: "Answer text is too long." });
+          return;
+        }
+      } else if (typeof value === "boolean") {
+        // true_false answers — nothing further to validate.
+      } else if (Array.isArray(value)) {
+        // matching answers: one string per pair, in pair order.
+        if (
+          value.length > MAX_MATCHING_ANSWERS ||
+          value.some((item) => typeof item !== "string")
+        ) {
+          res
+            .status(400)
+            .json({ success: false, message: "Invalid answer format." });
+          return;
+        }
+        if (
+          value.some((item: string) => item.length > MAX_ANSWER_TEXT_LENGTH)
+        ) {
           res
             .status(400)
             .json({ success: false, message: "Answer text is too long." });
