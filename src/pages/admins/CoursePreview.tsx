@@ -27,12 +27,12 @@ export default function CoursePreview() {
   const applyPersistedModules = (
     transform: (modules: Course["modules"]) => Course["modules"],
   ) => {
-    setCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
-    setOriginalCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
+    setCourse((c) => c && { ...c, modules: transform(c.modules) });
+    setOriginalCourse((c) => c && { ...c, modules: transform(c.modules) });
   };
 
   // ── Derived: resolve course from store, falling back to navigation state
-  const passedCourse = location.state?.course;
+  const passedCourse = location.state?.course as Course | undefined;
   const storeCourse = courses.find(
     (c) => c.id === Number(courseId) || c.id === passedCourse?.id,
   );
@@ -42,8 +42,10 @@ export default function CoursePreview() {
   const [uploading, setUploading] = useState(false);
 
   // ── Course state (working copy + snapshot for cancel)
-  const [course, setCourse] = useState(storeCourse ?? passedCourse);
-  const [originalCourse, setOriginalCourse] = useState(
+  const [course, setCourse] = useState<Course | undefined>(
+    storeCourse ?? passedCourse,
+  );
+  const [originalCourse, setOriginalCourse] = useState<Course | undefined>(
     storeCourse ?? passedCourse,
   );
 
@@ -77,6 +79,17 @@ export default function CoursePreview() {
 
   // ── Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // ── Guards: course missing (after every hook, so hook order is stable)
+  if (!course || !originalCourse) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-lg font-medium text-gray-600 dark:text-gray-400">
+          Loading course...
+        </p>
+      </div>
+    );
+  }
 
   // ── Handlers: delete
   const handleDeleteCourse = async () => {
@@ -146,16 +159,17 @@ export default function CoursePreview() {
   const saveChanges = async () => {
     try {
       // objects — never send them to the backend. Only send real string keys.
+      const thumbnailUrl = course.thumbnailUrl;
       const isPersistedThumbnail =
-        course.thumbnailUrl &&
-        typeof course.thumbnailUrl === "string" &&
-        !course.thumbnailUrl.startsWith("data:") &&
-        !course.thumbnailUrl.startsWith("blob:");
+        thumbnailUrl &&
+        typeof thumbnailUrl === "string" &&
+        !thumbnailUrl.startsWith("data:") &&
+        !thumbnailUrl.startsWith("blob:");
 
       const thumbnailToSave = isPersistedThumbnail
-        ? course.thumbnailUrl.startsWith("http")
-          ? new URL(course.thumbnailUrl).pathname // ← extract /api/thumbnails/uuid.png
-          : course.thumbnailUrl
+        ? thumbnailUrl.startsWith("http")
+          ? new URL(thumbnailUrl).pathname // ← extract /api/thumbnails/uuid.png
+          : thumbnailUrl
         : null;
 
       await updateCourse(course.id, {
@@ -171,10 +185,8 @@ export default function CoursePreview() {
       });
 
       // ── Persist staged module renames (only modules whose title changed)
-      for (const mod of course.modules as Course["modules"]) {
-        const original = (originalCourse.modules as Course["modules"]).find(
-          (m) => m.id === mod.id,
-        );
+      for (const mod of course.modules) {
+        const original = originalCourse.modules.find((m) => m.id === mod.id);
         if (original && original.title !== mod.title) {
           await updateModule(course.id, mod.id, { title: mod.title });
         }
@@ -191,7 +203,7 @@ export default function CoursePreview() {
     field: K,
     value: Course[K],
   ) => {
-    setCourse((prev: Course) => {
+    setCourse((prev) => {
       if (!prev) return prev;
       return { ...prev, [field]: value };
     });
@@ -201,326 +213,316 @@ export default function CoursePreview() {
   return (
     <div className="min-h-screen text-gray-900 dark:text-gray-100">
       <div>
-        {!course ? (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <p className="text-lg font-medium text-gray-600 dark:text-gray-400">
-              Loading course...
-            </p>
+        {/* Top bar: edit/save or edit/delete actions */}
+        <div className="sticky top-0 z-10  px-6 py-4 flex items-center justify-end">
+          <div className="flex items-center gap-4">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={cancelEdit}
+                  className="flex items-center gap-2 px-5 py-2 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveChanges}
+                  disabled={!online}
+                  title={!online ? "You're offline" : undefined}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
+                    online
+                      ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                      : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  <Save size={18} />
+                  Save Changes
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  disabled={!online}
+                  title={!online ? "You're offline" : undefined}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
+                    online
+                      ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                      : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  <Edit size={18} />
+                  Edit Course
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  disabled={!online}
+                  title={!online ? "You're offline" : undefined}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
+                    online
+                      ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                      : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  <Trash2Icon size={18} />
+                  Delete Course
+                </button>
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            {/* Top bar: edit/save or edit/delete actions */}
-            <div className="sticky top-0 z-10  px-6 py-4 flex items-center justify-end">
-              <div className="flex items-center gap-4">
-                {isEditing ? (
-                  <>
-                    <button
-                      onClick={cancelEdit}
-                      className="flex items-center gap-2 px-5 py-2 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveChanges}
-                      disabled={!online}
-                      title={!online ? "You're offline" : undefined}
-                      className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
-                        online
-                          ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                          : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <Save size={18} />
-                      Save Changes
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      disabled={!online}
-                      title={!online ? "You're offline" : undefined}
-                      className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
-                        online
-                          ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
-                          : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <Edit size={18} />
-                      Edit Course
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      disabled={!online}
-                      title={!online ? "You're offline" : undefined}
-                      className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium ${
-                        online
-                          ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-                          : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <Trash2Icon size={18} />
-                      Delete Course
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+        </div>
 
-            {/* Hero banner: thumbnail + editable course details */}
-            <div className="relative border-b border-gray-200 dark:border-gray-800 dark:bg-[#111827] overflow-hidden">
-              <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-20 py-8">
-                <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center">
-                  {/* Thumbnail (click-to-upload while editing) */}
-                  <div className="w-full md:w-56 lg:w-120 shrink-0">
-                    <div
-                      className={`relative group ${isEditing && online ? "cursor-pointer" : "cursor-default"}`}
-                      onClick={() =>
-                        isEditing && online && fileInputRef.current?.click()
-                      }
-                    >
-                      {uploading && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-xl">
-                          <Loader2
-                            size={28}
-                            className="animate-spin text-white"
-                          />
-                        </div>
-                      )}
-
-                      <img
-                        src={resolveThumbnailUrl(course.thumbnailUrl)}
-                        alt="thumbnail"
-                        className="w-full aspect-video object-cover rounded-xl shadow-lg"
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          if (!img.dataset.errored) {
-                            img.dataset.errored = "1";
-                            img.src = "/module-thumbnail.png";
-                          }
-                        }}
+        {/* Hero banner: thumbnail + editable course details */}
+        <div className="relative border-b border-gray-200 dark:border-gray-800 dark:bg-[#111827] overflow-hidden">
+          <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-20 py-8">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center">
+              {/* Thumbnail (click-to-upload while editing) */}
+              <div className="w-full md:w-56 lg:w-120 shrink-0">
+                <div
+                  className={`relative group ${isEditing && online ? "cursor-pointer" : "cursor-default"}`}
+                  onClick={() =>
+                    isEditing && online && fileInputRef.current?.click()
+                  }
+                >
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-xl">
+                      <Loader2
+                        size={28}
+                        className="animate-spin text-white"
                       />
-
-                      {isEditing && online && !uploading && (
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                          <div className="flex items-center gap-2 text-white text-sm font-medium bg-black/60 px-3 py-1.5 rounded-lg">
-                            <Upload size={14} />
-                            Change thumbnail
-                          </div>
-                        </div>
-                      )}
                     </div>
+                  )}
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={handleThumbnailUpload}
-                    />
-                  </div>
-                  {/* Text content */}
-                  <div className="flex-1 min-w-0 space-y-3">
-                    {/* Level badge */}
-                    {isEditing ? (
-                      <div className="flex items-center gap-3">
-                        <select
-                          value={course.level ?? "Easy"}
-                          onChange={(e) => {
-                            const newLevel = e.target.value;
-                            updateCourseField("level", newLevel);
-                            const colors: Record<string, string> = {
-                              easy: "#2FE12F",
-                              moderate: "#F59E0B",
-                              hard: "#EF4444",
-                              "all levels": "#8B5CF6",
-                            };
-                            updateCourseField(
-                              "levelColor",
-                              colors[newLevel.toLowerCase()] ?? "#6B7280",
-                            );
-                          }}
-                          className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full px-4 py-1 text-xs font-medium text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer appearance-none"
-                        >
-                          <option value="Easy">Easy</option>
-                          <option value="Moderate">Moderate</option>
-                          <option value="Hard">Hard</option>
-                          <option value="All Levels">All Levels</option>
-                        </select>
-                        <span
-                          style={{ backgroundColor: course.levelColor }}
-                          className="px-3 py-1 text-xs font-semibold text-white rounded-full"
-                        >
-                          {course.level || "Difficulty"}
-                        </span>
+                  <img
+                    src={resolveThumbnailUrl(course.thumbnailUrl)}
+                    alt="thumbnail"
+                    className="w-full aspect-video object-cover rounded-xl shadow-lg"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (!img.dataset.errored) {
+                        img.dataset.errored = "1";
+                        img.src = "/module-thumbnail.png";
+                      }
+                    }}
+                  />
+
+                  {isEditing && online && !uploading && (
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                      <div className="flex items-center gap-2 text-white text-sm font-medium bg-black/60 px-3 py-1.5 rounded-lg">
+                        <Upload size={14} />
+                        Change thumbnail
                       </div>
-                    ) : (
-                      <span
-                        style={{
-                          backgroundColor: course.levelColor ?? "#2FE12F",
-                        }}
-                        className="inline-block px-3 py-1 text-xs font-semibold text-white rounded-full"
-                      >
-                        {course.level || "Difficulty"}
-                      </span>
-                    )}
+                    </div>
+                  )}
+                </div>
 
-                    {/* Category */}
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={course.category ?? "Personal Development"}
-                          onChange={(e) =>
-                            updateCourseField("category", e.target.value)
-                          }
-                          className="text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-gray-900 dark:text-white cursor-pointer"
-                        >
-                          {COURSE_CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {course.category ?? "—"}
-                        </span>
-                      </p>
-                    )}
-
-                    {/* Title */}
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={course.title}
-                        onChange={(e) =>
-                          updateCourseField("title", e.target.value)
-                        }
-                        className="text-2xl md:text-3xl font-bold bg-transparent border-b border-gray-400 dark:border-gray-600 focus:outline-none focus:border-blue-500 w-full text-gray-900 dark:text-white"
-                        maxLength={60}
-                        placeholder="Course title"
-                      />
-                    ) : (
-                      <h1
-                        className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white leading-snug truncate"
-                        title={course.title}
-                      >
-                        {course.title}
-                      </h1>
-                    )}
-
-                    {/* Subtitle */}
-                    {isEditing ? (
-                      <textarea
-                        value={course.subtitle ?? ""}
-                        onChange={(e) =>
-                          updateCourseField("subtitle", e.target.value)
-                        }
-                        className="w-full p-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
-                        placeholder="Course subtitle"
-                        rows={2}
-                        maxLength={120}
-                      />
-                    ) : (
-                      course.subtitle && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                          {course.subtitle}
-                        </p>
-                      )
-                    )}
-
-                    {/* Instructor */}
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          by
-                        </span>
-                        <input
-                          type="text"
-                          value={course.instructor ?? ""}
-                          onChange={(e) =>
-                            updateCourseField("instructor", e.target.value)
-                          }
-                          className="text-sm font-medium bg-transparent border-b border-gray-400 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-full"
-                          placeholder="Instructor name"
-                          maxLength={60}
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        by{" "}
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {course.instructor}
-                        </span>
-                      </p>
-                    )}
-
-                    {/* Open Course CTA */}
-                    <button
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-3 px-4 rounded-lg cursor-pointer transition-colors"
-                      onClick={() => {
-                        const courseSlug = passedCourse.title
-                          .toLowerCase()
-                          .replace(/\s+/g, "-")
-                          .replace(/[^a-z0-9-]/g, "");
-                        const startingModuleNum =
-                          passedCourse.modules?.[0]?.number || 1;
-                        navigate(
-                          `/admin/course/${courseSlug}/${startingModuleNum}/introduction`,
-                          { state: { course: passedCourse } },
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleThumbnailUpload}
+                />
+              </div>
+              {/* Text content */}
+              <div className="flex-1 min-w-0 space-y-3">
+                {/* Level badge */}
+                {isEditing ? (
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={course.level ?? "Easy"}
+                      onChange={(e) => {
+                        const newLevel = e.target.value;
+                        updateCourseField("level", newLevel);
+                        const colors: Record<string, string> = {
+                          easy: "#2FE12F",
+                          moderate: "#F59E0B",
+                          hard: "#EF4444",
+                          "all levels": "#8B5CF6",
+                        };
+                        updateCourseField(
+                          "levelColor",
+                          colors[newLevel.toLowerCase()] ?? "#6B7280",
                         );
                       }}
+                      className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full px-4 py-1 text-xs font-medium text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer appearance-none"
                     >
-                      Open Course
-                    </button>
+                      <option value="Easy">Easy</option>
+                      <option value="Moderate">Moderate</option>
+                      <option value="Hard">Hard</option>
+                      <option value="All Levels">All Levels</option>
+                    </select>
+                    <span
+                      style={{ backgroundColor: course.levelColor }}
+                      className="px-3 py-1 text-xs font-semibold text-white rounded-full"
+                    >
+                      {course.level || "Difficulty"}
+                    </span>
                   </div>
-                </div>
-              </div>
-            </div>
+                ) : (
+                  <span
+                    style={{
+                      backgroundColor: course.levelColor ?? "#2FE12F",
+                    }}
+                    className="inline-block px-3 py-1 text-xs font-semibold text-white rounded-full"
+                  >
+                    {course.level || "Difficulty"}
+                  </span>
+                )}
 
-            {/* Tabs */}
-            <div className=" border-b border-gray-200 dark:border-gray-800">
-              <div className="max-w-7xl mx-auto px-6">
-                <div className="flex overflow-x-auto scrollbar-hide space-x-3 py-3">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`px-6 py-3 font-medium text-base whitespace-nowrap rounded-lg border-b-2 cursor-pointer ${
-                        activeTab === tab.id
-                          ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold"
-                          : "border-transparent text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                      }`}
+                {/* Category */}
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={course.category ?? "Personal Development"}
+                      onChange={(e) =>
+                        updateCourseField("category", e.target.value)
+                      }
+                      className="text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-gray-900 dark:text-white cursor-pointer"
                     >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                      {COURSE_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {course.category ?? "—"}
+                    </span>
+                  </p>
+                )}
+
+                {/* Title */}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={course.title}
+                    onChange={(e) =>
+                      updateCourseField("title", e.target.value)
+                    }
+                    className="text-2xl md:text-3xl font-bold bg-transparent border-b border-gray-400 dark:border-gray-600 focus:outline-none focus:border-blue-500 w-full text-gray-900 dark:text-white"
+                    maxLength={60}
+                    placeholder="Course title"
+                  />
+                ) : (
+                  <h1
+                    className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white leading-snug truncate"
+                    title={course.title}
+                  >
+                    {course.title}
+                  </h1>
+                )}
+
+                {/* Subtitle */}
+                {isEditing ? (
+                  <textarea
+                    value={course.subtitle ?? ""}
+                    onChange={(e) =>
+                      updateCourseField("subtitle", e.target.value)
+                    }
+                    className="w-full p-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
+                    placeholder="Course subtitle"
+                    rows={2}
+                    maxLength={120}
+                  />
+                ) : (
+                  course.subtitle && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {course.subtitle}
+                    </p>
+                  )
+                )}
+
+                {/* Instructor */}
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      by
+                    </span>
+                    <input
+                      type="text"
+                      value={course.instructor ?? ""}
+                      onChange={(e) =>
+                        updateCourseField("instructor", e.target.value)
+                      }
+                      className="text-sm font-medium bg-transparent border-b border-gray-400 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-full"
+                      placeholder="Instructor name"
+                      maxLength={60}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    by{" "}
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {course.instructor}
+                    </span>
+                  </p>
+                )}
+
+                {/* Open Course CTA */}
+                <button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-3 px-4 rounded-lg cursor-pointer transition-colors"
+                  onClick={() => {
+                    const courseSlug = course.title
+                      .toLowerCase()
+                      .replace(/\s+/g, "-")
+                      .replace(/[^a-z0-9-]/g, "");
+                    const startingModuleNum =
+                      course.modules?.[0]?.number || 1;
+                    navigate(
+                      `/admin/course/${courseSlug}/${startingModuleNum}/introduction`,
+                      { state: { course } },
+                    );
+                  }}
+                >
+                  Open Course
+                </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Tab content */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-              {activeTab === "overview" && (
-                <PreviewOverview
-                  course={course}
-                  isEditing={isEditing}
-                  updateCourseField={updateCourseField}
-                />
-              )}
-              {activeTab === "content" && (
-                <PreviewContents
-                  course={course}
-                  isEditing={isEditing}
-                  updateCourseField={updateCourseField}
-                  onModulesPersisted={applyPersistedModules}
-                />
-              )}
+        {/* Tabs */}
+        <div className=" border-b border-gray-200 dark:border-gray-800">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex overflow-x-auto scrollbar-hide space-x-3 py-3">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-6 py-3 font-medium text-base whitespace-nowrap rounded-lg border-b-2 cursor-pointer ${
+                    activeTab === tab.id
+                      ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold"
+                      : "border-transparent text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          </>
-        )}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {activeTab === "overview" && (
+            <PreviewOverview
+              course={course}
+              isEditing={isEditing}
+              updateCourseField={updateCourseField}
+            />
+          )}
+          {activeTab === "content" && (
+            <PreviewContents
+              course={course}
+              isEditing={isEditing}
+              updateCourseField={updateCourseField}
+              onModulesPersisted={applyPersistedModules}
+            />
+          )}
+        </div>
       </div>
 
       {/* Delete modal */}

@@ -8,7 +8,7 @@ import {
   ModuleVideo,
   QuizQuestion,
 } from "@/types/types";
-import { courseService } from "@/services/courseService";
+import { courseService, CoursePayload } from "@/services/courseService";
 import type { ModuleWeightEntry } from "@/utils/moduleWeights";
 import { toast } from "react-toastify";
 import { getLocalCourses } from "@/services/syncService";
@@ -22,7 +22,7 @@ interface CourseStore {
 
   fetchCourses: () => Promise<boolean>;
   addCourse: (data: Omit<Course, "id" | "modules">) => Promise<void>;
-  updateCourse: (id: number, data: Partial<Course>) => Promise<void>;
+  updateCourse: (id: number, data: CoursePayload) => Promise<void>;
   deleteCourse: (id: number) => Promise<void>;
   updateCourseField: (
     courseId: number,

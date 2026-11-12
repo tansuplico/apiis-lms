@@ -1,4 +1,4 @@
-// src/components/admin/course/WeightModal.tsx
+// src/components/admins/courses/WeightModal.tsx
 import { useState, useMemo, useEffect } from "react";
 import { X } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";

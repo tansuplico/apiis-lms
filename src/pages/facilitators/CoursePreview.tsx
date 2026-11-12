@@ -26,34 +26,25 @@ export default function CoursePreview() {
   const applyPersistedModules = (
     transform: (modules: Course["modules"]) => Course["modules"],
   ) => {
-    setCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
-    setOriginalCourse((c: Course) => ({ ...c, modules: transform(c.modules) }));
+    setCourse((c) => c && { ...c, modules: transform(c.modules) });
+    setOriginalCourse((c) => c && { ...c, modules: transform(c.modules) });
   };
 
   // ── Derived: resolve course from store, falling back to navigation state
-  const passedCourse = location.state?.course;
+  const passedCourse = location.state?.course as Course | undefined;
   const storeCourse = courses.find(
     (c) => c.id === Number(courseId) || c.id === passedCourse?.id,
   );
-
-  // ── Guards: course not found
-  if (!storeCourse && !passedCourse) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-lg text-gray-500 dark:text-gray-400">
-          Course not found.
-        </p>
-      </div>
-    );
-  }
 
   // ── Thumbnail upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   // ── Course state (working copy + snapshot for cancel)
-  const [course, setCourse] = useState(storeCourse ?? passedCourse);
-  const [originalCourse, setOriginalCourse] = useState(
+  const [course, setCourse] = useState<Course | undefined>(
+    storeCourse ?? passedCourse,
+  );
+  const [originalCourse, setOriginalCourse] = useState<Course | undefined>(
     storeCourse ?? passedCourse,
   );
 
@@ -84,6 +75,17 @@ export default function CoursePreview() {
       }
     }
   }, [storeCourse]);
+
+  // ── Guards: course not found (after every hook, so hook order is stable)
+  if (!course || !originalCourse) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-lg text-gray-500 dark:text-gray-400">
+          Course not found.
+        </p>
+      </div>
+    );
+  }
 
   // ── Handlers: thumbnail upload
   const handleThumbnailUpload = async (
@@ -145,16 +147,17 @@ export default function CoursePreview() {
 
   const saveChanges = async () => {
     try {
+      const thumbnailUrl = course.thumbnailUrl;
       const isPersistedThumbnail =
-        course.thumbnailUrl &&
-        typeof course.thumbnailUrl === "string" &&
-        !course.thumbnailUrl.startsWith("data:") &&
-        !course.thumbnailUrl.startsWith("blob:");
+        thumbnailUrl &&
+        typeof thumbnailUrl === "string" &&
+        !thumbnailUrl.startsWith("data:") &&
+        !thumbnailUrl.startsWith("blob:");
 
       const thumbnailToSave = isPersistedThumbnail
-        ? course.thumbnailUrl.startsWith("http")
-          ? new URL(course.thumbnailUrl).pathname // ← extract /api/thumbnails/uuid.png
-          : course.thumbnailUrl
+        ? thumbnailUrl.startsWith("http")
+          ? new URL(thumbnailUrl).pathname // ← extract /api/thumbnails/uuid.png
+          : thumbnailUrl
         : null;
 
       await updateCourse(course.id, {
@@ -170,10 +173,8 @@ export default function CoursePreview() {
       });
 
       // ── Persist staged module renames (only modules whose title changed)
-      for (const mod of course.modules as Course["modules"]) {
-        const original = (originalCourse.modules as Course["modules"]).find(
-          (m) => m.id === mod.id,
-        );
+      for (const mod of course.modules) {
+        const original = originalCourse.modules.find((m) => m.id === mod.id);
         if (original && original.title !== mod.title) {
           await updateModule(course.id, mod.id, { title: mod.title });
         }
@@ -191,7 +192,7 @@ export default function CoursePreview() {
     field: K,
     value: Course[K],
   ) => {
-    setCourse((prev: Course) => {
+    setCourse((prev) => {
       if (!prev) return prev;
       return { ...prev, [field]: value };
     });

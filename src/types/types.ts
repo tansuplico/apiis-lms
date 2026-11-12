@@ -141,7 +141,7 @@ export type Course = {
   level: string;
   levelColor: string;
   bgColor: string;
-  thumbnailUrl: string;
+  thumbnailUrl: string | null;
   modulesCount?: number;
   totalDuration?: string;
   subtitle?: string;
@@ -222,7 +222,6 @@ export interface Ticket {
 // ─── Gradebook ────────────────────────────────────────────────
 export interface GradebookState {
   overallScore: number;
-  overallPassed: boolean;
   modules: GradebookEntry[];
 }
 
@@ -301,7 +300,6 @@ interface CenterGradebookStudent {
   lastName: string;
   modules: CenterGradebookModuleResult[];
   overallScore: number;
-  overallPassed: boolean;
 }
 
 export interface CenterGradebookState {

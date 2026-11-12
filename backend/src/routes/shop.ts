@@ -4,7 +4,6 @@ import {
   createShopItem,
   updateShopItem,
   deleteShopItem,
-  purchaseShopItem,
   getMyShopItems,
 } from "../controllers/shopController";
 import { authenticate, authorize } from "../middleware/auth";
@@ -30,13 +29,5 @@ router.put("/:id", authenticate, authorize("admin"), updateShopItem);
 
 // ── Admin: delete shop item
 router.delete("/:id", authenticate, authorize("admin"), deleteShopItem);
-
-// ── Student: purchase an item
-router.post(
-  "/:id/purchase",
-  authenticate,
-  authorize("student"),
-  purchaseShopItem,
-);
 
 export default router;

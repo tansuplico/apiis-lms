@@ -2,7 +2,7 @@ import { apiClient } from "./apiClient";
 import { Course, CourseModule, CoursePart, QuizQuestion } from "@/types/types";
 import type { ModuleWeightEntry } from "@/utils/moduleWeights";
 
-interface CoursePayload {
+export interface CoursePayload {
   title?: string;
   subtitle?: string;
   description?: string;
@@ -11,7 +11,8 @@ interface CoursePayload {
   levelColor?: string;
   category?: string;
   bgColor?: string;
-  thumbnailUrl?: string;
+  // null clears the saved thumbnail; undefined leaves it unchanged.
+  thumbnailUrl?: string | null;
 }
 
 export const courseService = {

@@ -1,7 +1,5 @@
 // src/utils/quizQuestions.ts
 
-import pool from "../config/db";
-
 export const MAX_QUIZ_OPTIONS = 6;
 export const MAX_MATCHING_PAIRS = 6;
 export const MAX_IDENTIFICATION_ANSWERS = 10;
@@ -211,56 +209,4 @@ export function mapQuestionData(
     explanation: questionData.explanation,
     ...(bankQuestionId ? { bankQuestionId } : {}),
   };
-}
-
-export type MergedQuestionRow = {
-  id: number;
-  part_id: number;
-  question_data: any;
-  order_num: number;
-  bank_question_id?: number;
-};
-
-/**
- * Fetches questions for one or more course parts, merging directly-authored
- * quiz_questions with bank-referenced questions (via quiz_bank_refs), in a
- * single combined order per part. Used by both the course/quiz GET
- * endpoints and progress grading, so the order a student sees a quiz in and
- * the order grading uses always agree.
- */
-export async function getMergedQuizQuestions(
-  partIds: number[],
-  client: Pick<typeof pool, "query"> = pool,
-): Promise<Map<number, MergedQuestionRow[]>> {
-  const merged = new Map<number, MergedQuestionRow[]>();
-  for (const partId of partIds) merged.set(partId, []);
-  if (partIds.length === 0) return merged;
-
-  const [directResult, bankResult] = await Promise.all([
-    client.query(
-      `SELECT id, part_id, question_data, COALESCE(order_num, id) AS order_num
-       FROM quiz_questions WHERE part_id = ANY($1::int[])`,
-      [partIds],
-    ),
-    client.query(
-      `SELECT qbr.id, qbr.part_id, qb.id AS bank_question_id, qb.question_data, qbr.order_num
-       FROM quiz_bank_refs qbr
-       JOIN question_bank qb ON qb.id = qbr.bank_question_id
-       WHERE qbr.part_id = ANY($1::int[])`,
-      [partIds],
-    ),
-  ]);
-
-  for (const row of directResult.rows) {
-    merged.get(row.part_id)?.push(row);
-  }
-  for (const row of bankResult.rows) {
-    merged.get(row.part_id)?.push(row);
-  }
-
-  for (const rows of merged.values()) {
-    rows.sort((a, b) => a.order_num - b.order_num || a.id - b.id);
-  }
-
-  return merged;
 }
