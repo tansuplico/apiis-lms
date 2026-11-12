@@ -855,16 +855,27 @@ export const addModule = async (req: Request, res: Response) => {
 
     if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
 
-    const lastModule = await pool.query(
-      `SELECT MAX(number) AS max_number FROM course_modules WHERE course_id = $1`,
-      [id],
-    );
-
-    const nextNumber = (lastModule.rows[0].max_number ?? 0) + 1;
-
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // Lock the course so concurrent adds/deletes on it run one at a time;
+      // otherwise two adds could read the same MAX and reuse a number.
+      const locked = await client.query(
+        `SELECT id FROM courses WHERE id = $1 FOR UPDATE`,
+        [id],
+      );
+      if (locked.rows.length === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ success: false, message: "Course not found." });
+        return;
+      }
+
+      const lastModule = await client.query(
+        `SELECT MAX(number) AS max_number FROM course_modules WHERE course_id = $1`,
+        [id],
+      );
+      const nextNumber = (lastModule.rows[0].max_number ?? 0) + 1;
 
       const moduleResult = await client.query(
         `INSERT INTO course_modules (course_id, number, title)
@@ -1061,12 +1072,29 @@ export const deleteModule = async (req: Request, res: Response) => {
 
     if (!(await facilitatorOwnsCourse(authReq, id, res))) return;
 
-    const moduleNumber: number = existing.rows[0].number;
-
     const client = await pool.connect();
     let affectedStudents = 0;
     try {
       await client.query("BEGIN");
+
+      // Same course lock as addModule, so a delete's renumbering can't
+      // interleave with an add on the same course.
+      await client.query(`SELECT id FROM courses WHERE id = $1 FOR UPDATE`, [
+        id,
+      ]);
+
+      // Re-read under the lock: another delete may have renumbered this
+      // module (or removed it) since the lookup above.
+      const current = await client.query(
+        `SELECT id, number FROM course_modules WHERE id = $1 AND course_id = $2`,
+        [moduleId, id],
+      );
+      if (current.rows.length === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ success: false, message: "Module not found." });
+        return;
+      }
+      const moduleNumber: number = current.rows[0].number;
 
       // Student progress and quiz answers are keyed by module NUMBER, and
       // deleting a module renumbers every module after it. So refuse if any
