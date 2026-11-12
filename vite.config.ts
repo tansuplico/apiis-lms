@@ -1,13 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
+// Dev only. The auth stores import other stores and services, so hot-
+// swapping one of those re-creates the auth store logged out and
+// ProtectedRoute bounces to Login. Reload the page instead; startup then
+// restores the session. Component edits keep normal hot reload.
+const fullReloadOnStateModules = (): Plugin => ({
+  name: "full-reload-on-state-modules",
+  apply: "serve",
+  handleHotUpdate({ file, server }) {
+    if (/\/src\/(stores|services)\//.test(file.replace(/\\/g, "/"))) {
+      server.ws.send({ type: "full-reload" });
+      return [];
+    }
+  },
+});
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), fullReloadOnStateModules()],
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
