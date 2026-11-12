@@ -2,6 +2,7 @@
 import { Router } from "express";
 import {
   getQuestionBank,
+  getBankCategories,
   createBankQuestion,
   updateBankQuestion,
   deleteBankQuestion,
@@ -16,6 +17,13 @@ router.get(
   authenticate,
   authorize("admin", "facilitator"),
   getQuestionBank,
+);
+// Must stay above any "/:id" GET so "categories" is never read as an id.
+router.get(
+  "/categories",
+  authenticate,
+  authorize("admin", "facilitator"),
+  getBankCategories,
 );
 router.post(
   "/",

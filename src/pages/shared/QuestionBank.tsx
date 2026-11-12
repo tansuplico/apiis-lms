@@ -1,5 +1,5 @@
 // src/pages/shared/QuestionBank.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Plus,
@@ -17,8 +17,10 @@ import {
   Check,
   Search,
   Filter,
+  Tag,
 } from "lucide-react";
 import {
+  BankCategory,
   BankQuestion,
   QuizBankCollection,
   QuizQuestionType,
@@ -32,6 +34,7 @@ import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkelet
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
 import FilterDropdown from "@/components/shared/FilterDropdown";
+import CategoryTagInput from "@/components/shared/CategoryTagInput";
 import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
 import { useSearchParams } from "react-router-dom";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -76,7 +79,13 @@ const emptyDraft = (
   type: QuizQuestionType,
   collectionId: number,
 ): DraftQuestion => {
-  const base = { type, question: "", explanation: "", collectionId };
+  const base = {
+    type,
+    question: "",
+    explanation: "",
+    collectionId,
+    categories: [] as string[],
+  };
   switch (type) {
     case "multiple_choice":
       return { ...base, options: ["", "", "", ""], correctOptionIndex: 0 };
@@ -111,6 +120,8 @@ export default function QuestionBank() {
   const activeCollection = activeCollectionId
     ? (collections.find((c) => c.id === Number(activeCollectionId)) ?? null)
     : null;
+  // "All questions" tab: the whole library at once, filterable by category.
+  const isAllView = !activeCollection && searchParams.get("view") === "all";
   const [viewMode, setViewMode] = useState<"grid" | "list">(
     () =>
       (localStorage.getItem("qb-collection-view") as "grid" | "list") || "grid",
@@ -138,16 +149,53 @@ export default function QuestionBank() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<QuizQuestionType | "all">("all");
+  // Lower-cased category name, or "all".
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  // Categories in use across the whole library, for the tag input's suggestions.
+  const [libraryCategories, setLibraryCategories] = useState<BankCategory[]>(
+    [],
+  );
+
+  // Categories present in the questions currently loaded, for the filter.
+  const availableCategories = useMemo(() => {
+    const byKey = new Map<
+      string,
+      { key: string; name: string; count: number }
+    >();
+    for (const q of questions) {
+      for (const tag of q.categories ?? []) {
+        const key = tag.toLowerCase();
+        const entry = byKey.get(key);
+        if (entry) entry.count++;
+        else byKey.set(key, { key, name: tag, count: 1 });
+      }
+    }
+    return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [questions]);
+
+  // If the selected category disappears (e.g. its last question was edited),
+  // fall back to showing everything instead of an empty list.
+  useEffect(() => {
+    if (
+      categoryFilter !== "all" &&
+      !availableCategories.some((c) => c.key === categoryFilter)
+    ) {
+      setCategoryFilter("all");
+    }
+  }, [availableCategories, categoryFilter]);
 
   const filteredQuestions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return questions.filter((q) => {
       const matchesType = typeFilter === "all" || q.type === typeFilter;
+      const matchesCategory =
+        categoryFilter === "all" ||
+        (q.categories ?? []).some((c) => c.toLowerCase() === categoryFilter);
       const matchesQuery =
         query.length === 0 || q.question.toLowerCase().includes(query);
-      return matchesType && matchesQuery;
+      return matchesType && matchesCategory && matchesQuery;
     });
-  }, [questions, searchQuery, typeFilter]);
+  }, [questions, searchQuery, typeFilter, categoryFilter]);
 
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<DraftQuestion>(
@@ -180,31 +228,61 @@ export default function QuestionBank() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Only the newest load may update the list, so quickly switching between a
+  // collection and the "All questions" tab can't show the wrong questions.
+  const latestLoad = useRef(0);
+
   useEffect(() => {
     if (activeCollection) {
       loadQuestions(activeCollection.id);
+    } else if (isAllView) {
+      loadQuestions();
     } else {
+      latestLoad.current++;
       setQuestions([]);
+      setQuestionsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCollection?.id]);
+  }, [activeCollection?.id, isAllView]);
 
-  const loadQuestions = async (collectionId: number) => {
+  // No collectionId loads the whole library.
+  const loadQuestions = async (collectionId?: number) => {
+    const requestId = ++latestLoad.current;
     setQuestionsLoading(true);
     try {
       const data = await questionBankService.getAll(collectionId);
-      setQuestions(data);
+      if (requestId === latestLoad.current) setQuestions(data);
     } catch {
-      toast.error("Failed to load questions.");
+      if (requestId === latestLoad.current) {
+        toast.error("Failed to load questions.");
+      }
     } finally {
-      setQuestionsLoading(false);
+      if (requestId === latestLoad.current) setQuestionsLoading(false);
+    }
+  };
+
+  const reloadQuestions = () => loadQuestions(activeCollection?.id);
+
+  const loadLibraryCategories = async () => {
+    try {
+      setLibraryCategories(await questionBankService.getCategories());
+    } catch {
+      // Suggestions are optional; typing a category still works without them.
     }
   };
 
   const openCollection = (c: QuizBankCollection) => {
     setSearchQuery("");
     setTypeFilter("all");
+    setCategoryFilter("all");
     setSearchParams({ collection: String(c.id) });
+  };
+
+  const openAllQuestions = () => {
+    setSearchQuery("");
+    setTypeFilter("all");
+    setCategoryFilter("all");
+    setSearchParams({ view: "all" });
   };
 
   const backToCollections = () => setSearchParams({});
@@ -277,6 +355,7 @@ export default function QuestionBank() {
     setDraft(emptyDraft("multiple_choice", activeCollection.id));
     setAttemptedSave(false);
     setEditingId("new");
+    loadLibraryCategories();
   };
 
   const startEdit = (q: BankQuestion) => {
@@ -292,9 +371,11 @@ export default function QuestionBank() {
       matchingPairs: q.matchingPairs,
       explanation: q.explanation,
       collectionId: q.collectionId,
+      categories: q.categories ?? [],
     });
     setAttemptedSave(false);
     setEditingId(q.id);
+    loadLibraryCategories();
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -315,6 +396,7 @@ export default function QuestionBank() {
       question: prev.question,
       explanation: prev.explanation,
       imageUrl: prev.imageUrl,
+      categories: prev.categories,
     }));
   };
 
@@ -415,7 +497,7 @@ export default function QuestionBank() {
         toast.success("Question updated.");
       }
       setEditingId(null);
-      if (activeCollection) loadQuestions(activeCollection.id);
+      reloadQuestions();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to save the question.",
@@ -437,7 +519,7 @@ export default function QuestionBank() {
           ? `Deleted. Removed from ${result.quizzesAffected} quiz(zes).`
           : "Deleted.",
       );
-      if (activeCollection) loadQuestions(activeCollection.id);
+      reloadQuestions();
       setPendingDeleteQuestion(null);
     } catch {
       toast.error("Failed to delete the question.");
@@ -446,12 +528,676 @@ export default function QuestionBank() {
     }
   };
 
+  const questionFilters = questions.length > 0 && (
+    <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="relative flex-1">
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+        />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search questions..."
+          className="w-full pl-9 pr-9 py-2.5 border outline-none rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Clear search"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+      <FilterDropdown
+        value={typeFilter}
+        onChange={(v) => setTypeFilter(v as QuizQuestionType | "all")}
+        options={[
+          { value: "all", label: "All types" },
+          ...(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
+            (type) => ({
+              value: type,
+              label: QUESTION_TYPE_LABELS[type],
+            }),
+          ),
+        ]}
+        icon={
+          <Filter
+            size={14}
+            className={
+              typeFilter !== "all"
+                ? "text-white"
+                : "text-gray-500 dark:text-gray-400"
+            }
+          />
+        }
+        active={typeFilter !== "all"}
+      />
+      {availableCategories.length > 0 && (
+        <FilterDropdown
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          options={[
+            { value: "all", label: "All categories" },
+            ...availableCategories.map((c) => ({
+              value: c.key,
+              label: `${c.name} (${c.count})`,
+            })),
+          ]}
+          icon={
+            <Tag
+              size={14}
+              className={
+                categoryFilter !== "all"
+                  ? "text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }
+            />
+          }
+          active={categoryFilter !== "all"}
+        />
+      )}
+    </div>
+  );
+
+  // One question row, shared by the collection view and the "All questions"
+  // tab. showCollection adds a chip naming the collection it lives in.
+  const renderQuestionCard = (q: BankQuestion, showCollection: boolean) => {
+    const collection = showCollection
+      ? collections.find((c) => c.id === q.collectionId)
+      : undefined;
+    return (
+      <div
+        key={q.id}
+        className="p-4 rounded-lg bg-white dark:bg-gray-800 flex items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              {QUESTION_TYPE_LABELS[q.type]}
+            </span>
+            {showCollection &&
+              (collection ? (
+                <button
+                  onClick={() => openCollection(collection)}
+                  title="Open this collection"
+                  className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-medium border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: colorForCollection(collection.id),
+                    }}
+                  />
+                  {collection.name}
+                </button>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-600 text-gray-500">
+                  Unknown collection
+                </span>
+              ))}
+            {(q.categories ?? []).map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setCategoryFilter(tag.toLowerCase())}
+                title="Show only this category"
+                className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          <p className="font-medium text-gray-900 dark:text-white truncate">
+            {q.question}
+          </p>
+          {q.imageUrl && (
+            <img
+              src={q.imageUrl}
+              alt="Question"
+              className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => startEdit(q)}
+            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            title="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => remove(q)}
+            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Switches between the collection folders and the whole library.
+  const scopeTabs = (
+    <div
+      role="tablist"
+      className="inline-flex p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
+    >
+      {(
+        [
+          ["collections", "Collections"],
+          ["all", "All questions"],
+        ] as const
+      ).map(([id, label]) => {
+        const active = (id === "all") === isAllView;
+        return (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={active}
+            onClick={() => {
+              if (active) return;
+              if (id === "all") openAllQuestions();
+              else backToCollections();
+            }}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              active
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const editorModal = editingId !== null && (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      onClick={cancelEdit}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-gray-800 rounded-xl max-w-xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            {editingId === "new" ? "Add Question" : "Edit Question"}
+          </h2>
+          <button
+            onClick={cancelEdit}
+            className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            Question Type
+          </label>
+          <div className="grid grid-cols-5 gap-1.5 mb-4">
+            {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
+              (t) => {
+                const Icon = QUESTION_TYPE_ICONS[t];
+                const active = draft.type === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => changeType(t)}
+                    title={QUESTION_TYPE_LABELS[t]}
+                    className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg border text-center leading-tight ${
+                      active
+                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300"
+                        : "border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <Icon size={16} />
+                    <span className="text-[10px] font-medium">
+                      {QUESTION_TYPE_LABELS[t]}
+                    </span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+            Question Text
+          </label>
+          <input
+            type="text"
+            value={draft.question}
+            onChange={(e) =>
+              setDraft((prev) => ({ ...prev, question: e.target.value }))
+            }
+            className={`w-full p-2 border rounded mb-1 dark:bg-gray-700 dark:text-white ${
+              attemptedSave && !draft.question.trim()
+                ? "border-red-400 dark:border-red-500"
+                : "border-gray-300 dark:border-gray-600"
+            }`}
+            placeholder={
+              draft.type === "fill_in_the_blank"
+                ? 'e.g. "The capital of France is ___."'
+                : "Enter question..."
+            }
+          />
+          {draft.type === "fill_in_the_blank" && (
+            <p
+              className={`text-xs mb-3 ${
+                attemptedSave &&
+                draft.question.trim() &&
+                !draft.question.includes("___")
+                  ? "text-red-500 dark:text-red-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              Use{" "}
+              <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                ___
+              </code>{" "}
+              to mark where the blank should appear.
+            </p>
+          )}
+
+          <div className="mb-4">
+            {draft.imageUrl ? (
+              <div className="relative inline-block">
+                <img
+                  src={draft.imageUrl}
+                  alt="Question"
+                  className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
+                />
+                <button
+                  onClick={() =>
+                    setDraft((prev) => ({ ...prev, imageUrl: undefined }))
+                  }
+                  className="absolute -top-2 -right-2 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <ImageIcon size={16} />
+                Add image (optional)
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+          </div>
+
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
+            Answer
+          </p>
+
+          {draft.type === "multiple_choice" && (
+            <div className="space-y-2 mb-1">
+              {(draft.options ?? []).map((opt, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 p-1.5 rounded-lg border ${
+                    draft.correctOptionIndex === idx
+                      ? "border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700"
+                      : "border-transparent"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    checked={draft.correctOptionIndex === idx}
+                    onChange={() =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        correctOptionIndex: idx,
+                      }))
+                    }
+                    className="shrink-0 accent-green-600"
+                    title="Mark as correct"
+                  />
+                  <input
+                    type="text"
+                    value={opt}
+                    onChange={(e) =>
+                      setDraft((prev) => {
+                        const next = [...(prev.options ?? [])];
+                        next[idx] = e.target.value;
+                        return { ...prev, options: next };
+                      })
+                    }
+                    className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                      attemptedSave && !opt.trim()
+                        ? "border-red-400 dark:border-red-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder={`Option ${idx + 1}`}
+                  />
+                  {(draft.options?.length ?? 0) > 2 && (
+                    <button
+                      onClick={() => removeOption(idx)}
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {(draft.options?.length ?? 0) < MAX_QUIZ_OPTIONS && (
+                <button
+                  onClick={addOption}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Add option
+                </button>
+              )}
+              <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                Select the radio button next to the correct option.
+              </p>
+            </div>
+          )}
+
+          {draft.type === "identification" && (
+            <div className="mb-1">
+              {(draft.correctAnswers ?? [""]).map((ans, idx) => (
+                <div key={idx} className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={ans}
+                    onChange={(e) =>
+                      setDraft((prev) => {
+                        const next = [...(prev.correctAnswers ?? [""])];
+                        next[idx] = e.target.value;
+                        return { ...prev, correctAnswers: next };
+                      })
+                    }
+                    className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                      attemptedSave && !ans.trim()
+                        ? "border-red-400 dark:border-red-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder={
+                      idx === 0 ? "e.g. Paris" : "Another accepted answer"
+                    }
+                  />
+                  {(draft.correctAnswers?.length ?? 1) > 1 && (
+                    <button
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          correctAnswers: (prev.correctAnswers ?? []).filter(
+                            (_, i) => i !== idx,
+                          ),
+                        }))
+                      }
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {(draft.correctAnswers?.length ?? 0) <
+                MAX_IDENTIFICATION_ANSWERS && (
+                <button
+                  onClick={() =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      correctAnswers: [...(prev.correctAnswers ?? [""]), ""],
+                    }))
+                  }
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Add another accepted answer
+                </button>
+              )}
+            </div>
+          )}
+
+          {draft.type === "fill_in_the_blank" && (
+            <div className="mb-1">
+              <input
+                type="text"
+                value={draft.correctAnswer ?? ""}
+                onChange={(e) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    correctAnswer: e.target.value,
+                  }))
+                }
+                className={`w-full p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                  attemptedSave && !draft.correctAnswer?.trim()
+                    ? "border-red-400 dark:border-red-500"
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+                placeholder="e.g. Paris (exact answer, case insensitive)"
+              />
+            </div>
+          )}
+
+          {draft.type === "true_false" && (
+            <div className="mb-1 flex gap-2">
+              {[true, false].map((val) => {
+                const active = (draft.correctBoolean ?? true) === val;
+                return (
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        correctBoolean: val,
+                      }))
+                    }
+                    className={`flex-1 py-2 rounded-lg border text-sm font-medium flex items-center justify-center gap-1.5 ${
+                      active
+                        ? "border-green-300 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300"
+                        : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {active && <Check size={14} />}
+                    {val ? "True" : "False"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {draft.type === "matching" && (
+            <div className="mb-1">
+              {(draft.matchingPairs ?? []).map((pair, idx) => (
+                <div key={idx} className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={pair.left}
+                    onChange={(e) =>
+                      setDraft((prev) => {
+                        const next = [...(prev.matchingPairs ?? [])];
+                        next[idx] = { ...next[idx], left: e.target.value };
+                        return { ...prev, matchingPairs: next };
+                      })
+                    }
+                    className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                      attemptedSave && !pair.left.trim()
+                        ? "border-red-400 dark:border-red-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder="Left item"
+                  />
+                  <span className="text-gray-400 shrink-0">→</span>
+                  <input
+                    type="text"
+                    value={pair.right}
+                    onChange={(e) =>
+                      setDraft((prev) => {
+                        const next = [...(prev.matchingPairs ?? [])];
+                        next[idx] = {
+                          ...next[idx],
+                          right: e.target.value,
+                        };
+                        return { ...prev, matchingPairs: next };
+                      })
+                    }
+                    className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
+                      attemptedSave && !pair.right.trim()
+                        ? "border-red-400 dark:border-red-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder="Matching item"
+                  />
+                  {(draft.matchingPairs?.length ?? 0) > 2 && (
+                    <button
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          matchingPairs: (prev.matchingPairs ?? []).filter(
+                            (_, i) => i !== idx,
+                          ),
+                        }))
+                      }
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {(draft.matchingPairs?.length ?? 0) < MAX_MATCHING_PAIRS && (
+                <button
+                  onClick={() =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      matchingPairs: [
+                        ...(prev.matchingPairs ?? []),
+                        { left: "", right: "" },
+                      ],
+                    }))
+                  }
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Add another pair
+                </button>
+              )}
+            </div>
+          )}
+
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 mt-4">
+            Explanation (optional)
+          </label>
+          <textarea
+            value={draft.explanation ?? ""}
+            onChange={(e) =>
+              setDraft((prev) => ({
+                ...prev,
+                explanation: e.target.value,
+              }))
+            }
+            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            rows={2}
+          />
+
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 mt-4">
+            Categories (optional)
+          </label>
+          <CategoryTagInput
+            value={draft.categories ?? []}
+            onChange={(categories) =>
+              setDraft((prev) => ({ ...prev, categories }))
+            }
+            suggestions={libraryCategories.map((c) => c.name)}
+            disabled={saving}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+          <button
+            onClick={cancelEdit}
+            className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const deleteQuestionModal = pendingDeleteQuestion && (
+    <DeleteConfirmModal
+      title="Delete Question"
+      message="This question will also be removed from any quiz that references it."
+      itemName={pendingDeleteQuestion.question}
+      onConfirm={confirmRemoveQuestion}
+      onCancel={() => setPendingDeleteQuestion(null)}
+      isDeleting={deletingQuestion}
+    />
+  );
+
+  if (isAllView) {
+    return (
+      <div className="space-y-6 pb-12 text-gray-900 dark:text-gray-100">
+        <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
+          Question Bank
+        </h1>
+        {scopeTabs}
+
+        <div>
+          {questionFilters}
+
+          {questionsLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <BankQuestionSkeleton key={i} />
+              ))}
+            </div>
+          ) : questions.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              No questions in the bank yet. Open a collection to add one.
+            </p>
+          ) : filteredQuestions.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              No questions match your search or filter.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {filteredQuestions.map((q) => renderQuestionCard(q, true))}
+            </div>
+          )}
+        </div>
+
+        {editorModal}
+
+        {deleteQuestionModal}
+      </div>
+    );
+  }
+
   if (!activeCollection) {
     return (
       <div className="space-y-10 pb-12 text-gray-900 dark:text-gray-100">
         <h1 className="text-3xl md:text-4xl text-gray-900 dark:text-white">
           Question Bank
         </h1>
+        {scopeTabs}
         <div className="w-full lg:w-auto flex flex-wrap items-center justify-between gap-3">
           <div className="w-full sm:w-72 flex items-center gap-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 px-5 py-2 rounded-lg">
             <Search size={20} className="text-gray-500 dark:text-gray-400" />
@@ -740,56 +1486,7 @@ export default function QuestionBank() {
         </button>
       </div>
 
-      {questions.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search questions..."
-              className="w-full pl-9 pr-9 py-2.5 border outline-none rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                aria-label="Clear search"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-          <FilterDropdown
-            value={typeFilter}
-            onChange={(v) => setTypeFilter(v as QuizQuestionType | "all")}
-            options={[
-              { value: "all", label: "All types" },
-              ...(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
-                (type) => ({
-                  value: type,
-                  label: QUESTION_TYPE_LABELS[type],
-                }),
-              ),
-            ]}
-            icon={
-              <Filter
-                size={14}
-                className={
-                  typeFilter !== "all"
-                    ? "text-white"
-                    : "text-gray-500 dark:text-gray-400"
-                }
-              />
-            }
-            active={typeFilter !== "all"}
-          />
-        </div>
-      )}
+      {questionFilters}
 
       {questionsLoading ? (
         <div className="space-y-3">
@@ -807,472 +1504,13 @@ export default function QuestionBank() {
         </p>
       ) : (
         <div className="space-y-3">
-          {filteredQuestions.map((q) => (
-            <div
-              key={q.id}
-              className="p-4 rounded-lg bg-white dark:bg-gray-800 flex items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex-1 min-w-0">
-                <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                  {QUESTION_TYPE_LABELS[q.type]}
-                </span>
-                <p className="font-medium text-gray-900 dark:text-white truncate">
-                  {q.question}
-                </p>
-                {q.imageUrl && (
-                  <img
-                    src={q.imageUrl}
-                    alt="Question"
-                    className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
-                  />
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => startEdit(q)}
-                  className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                  title="Edit"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => remove(q)}
-                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                  title="Delete"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
+          {filteredQuestions.map((q) => renderQuestionCard(q, false))}
         </div>
       )}
 
-      {editingId !== null && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-          onClick={cancelEdit}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-gray-800 rounded-xl max-w-xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {editingId === "new" ? "Add Question" : "Edit Question"}
-              </h2>
-              <button
-                onClick={cancelEdit}
-                className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {editorModal}
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                Question Type
-              </label>
-              <div className="grid grid-cols-5 gap-1.5 mb-4">
-                {(Object.keys(QUESTION_TYPE_LABELS) as QuizQuestionType[]).map(
-                  (t) => {
-                    const Icon = QUESTION_TYPE_ICONS[t];
-                    const active = draft.type === t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => changeType(t)}
-                        title={QUESTION_TYPE_LABELS[t]}
-                        className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg border text-center leading-tight ${
-                          active
-                            ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300"
-                            : "border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <Icon size={16} />
-                        <span className="text-[10px] font-medium">
-                          {QUESTION_TYPE_LABELS[t]}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Question Text
-              </label>
-              <input
-                type="text"
-                value={draft.question}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, question: e.target.value }))
-                }
-                className={`w-full p-2 border rounded mb-1 dark:bg-gray-700 dark:text-white ${
-                  attemptedSave && !draft.question.trim()
-                    ? "border-red-400 dark:border-red-500"
-                    : "border-gray-300 dark:border-gray-600"
-                }`}
-                placeholder={
-                  draft.type === "fill_in_the_blank"
-                    ? 'e.g. "The capital of France is ___."'
-                    : "Enter question..."
-                }
-              />
-              {draft.type === "fill_in_the_blank" && (
-                <p
-                  className={`text-xs mb-3 ${
-                    attemptedSave &&
-                    draft.question.trim() &&
-                    !draft.question.includes("___")
-                      ? "text-red-500 dark:text-red-400"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  Use{" "}
-                  <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
-                    ___
-                  </code>{" "}
-                  to mark where the blank should appear.
-                </p>
-              )}
-
-              <div className="mb-4">
-                {draft.imageUrl ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={draft.imageUrl}
-                      alt="Question"
-                      className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
-                    />
-                    <button
-                      onClick={() =>
-                        setDraft((prev) => ({ ...prev, imageUrl: undefined }))
-                      }
-                      className="absolute -top-2 -right-2 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <ImageIcon size={16} />
-                    Add image (optional)
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
-                Answer
-              </p>
-
-              {draft.type === "multiple_choice" && (
-                <div className="space-y-2 mb-1">
-                  {(draft.options ?? []).map((opt, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center gap-2 p-1.5 rounded-lg border ${
-                        draft.correctOptionIndex === idx
-                          ? "border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700"
-                          : "border-transparent"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        checked={draft.correctOptionIndex === idx}
-                        onChange={() =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            correctOptionIndex: idx,
-                          }))
-                        }
-                        className="shrink-0 accent-green-600"
-                        title="Mark as correct"
-                      />
-                      <input
-                        type="text"
-                        value={opt}
-                        onChange={(e) =>
-                          setDraft((prev) => {
-                            const next = [...(prev.options ?? [])];
-                            next[idx] = e.target.value;
-                            return { ...prev, options: next };
-                          })
-                        }
-                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
-                          attemptedSave && !opt.trim()
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                        placeholder={`Option ${idx + 1}`}
-                      />
-                      {(draft.options?.length ?? 0) > 2 && (
-                        <button
-                          onClick={() => removeOption(idx)}
-                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {(draft.options?.length ?? 0) < MAX_QUIZ_OPTIONS && (
-                    <button
-                      onClick={addOption}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      + Add option
-                    </button>
-                  )}
-                  <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
-                    Select the radio button next to the correct option.
-                  </p>
-                </div>
-              )}
-
-              {draft.type === "identification" && (
-                <div className="mb-1">
-                  {(draft.correctAnswers ?? [""]).map((ans, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={ans}
-                        onChange={(e) =>
-                          setDraft((prev) => {
-                            const next = [...(prev.correctAnswers ?? [""])];
-                            next[idx] = e.target.value;
-                            return { ...prev, correctAnswers: next };
-                          })
-                        }
-                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
-                          attemptedSave && !ans.trim()
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                        placeholder={
-                          idx === 0 ? "e.g. Paris" : "Another accepted answer"
-                        }
-                      />
-                      {(draft.correctAnswers?.length ?? 1) > 1 && (
-                        <button
-                          onClick={() =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              correctAnswers: (
-                                prev.correctAnswers ?? []
-                              ).filter((_, i) => i !== idx),
-                            }))
-                          }
-                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {(draft.correctAnswers?.length ?? 0) <
-                    MAX_IDENTIFICATION_ANSWERS && (
-                    <button
-                      onClick={() =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          correctAnswers: [
-                            ...(prev.correctAnswers ?? [""]),
-                            "",
-                          ],
-                        }))
-                      }
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      + Add another accepted answer
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {draft.type === "fill_in_the_blank" && (
-                <div className="mb-1">
-                  <input
-                    type="text"
-                    value={draft.correctAnswer ?? ""}
-                    onChange={(e) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        correctAnswer: e.target.value,
-                      }))
-                    }
-                    className={`w-full p-2 border rounded dark:bg-gray-700 dark:text-white ${
-                      attemptedSave && !draft.correctAnswer?.trim()
-                        ? "border-red-400 dark:border-red-500"
-                        : "border-gray-300 dark:border-gray-600"
-                    }`}
-                    placeholder="e.g. Paris (exact answer, case insensitive)"
-                  />
-                </div>
-              )}
-
-              {draft.type === "true_false" && (
-                <div className="mb-1 flex gap-2">
-                  {[true, false].map((val) => {
-                    const active = (draft.correctBoolean ?? true) === val;
-                    return (
-                      <button
-                        key={String(val)}
-                        type="button"
-                        onClick={() =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            correctBoolean: val,
-                          }))
-                        }
-                        className={`flex-1 py-2 rounded-lg border text-sm font-medium flex items-center justify-center gap-1.5 ${
-                          active
-                            ? "border-green-300 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300"
-                            : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        {active && <Check size={14} />}
-                        {val ? "True" : "False"}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {draft.type === "matching" && (
-                <div className="mb-1">
-                  {(draft.matchingPairs ?? []).map((pair, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={pair.left}
-                        onChange={(e) =>
-                          setDraft((prev) => {
-                            const next = [...(prev.matchingPairs ?? [])];
-                            next[idx] = { ...next[idx], left: e.target.value };
-                            return { ...prev, matchingPairs: next };
-                          })
-                        }
-                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
-                          attemptedSave && !pair.left.trim()
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                        placeholder="Left item"
-                      />
-                      <span className="text-gray-400 shrink-0">→</span>
-                      <input
-                        type="text"
-                        value={pair.right}
-                        onChange={(e) =>
-                          setDraft((prev) => {
-                            const next = [...(prev.matchingPairs ?? [])];
-                            next[idx] = {
-                              ...next[idx],
-                              right: e.target.value,
-                            };
-                            return { ...prev, matchingPairs: next };
-                          })
-                        }
-                        className={`flex-1 p-2 border rounded dark:bg-gray-700 dark:text-white ${
-                          attemptedSave && !pair.right.trim()
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                        placeholder="Matching item"
-                      />
-                      {(draft.matchingPairs?.length ?? 0) > 2 && (
-                        <button
-                          onClick={() =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              matchingPairs: (prev.matchingPairs ?? []).filter(
-                                (_, i) => i !== idx,
-                              ),
-                            }))
-                          }
-                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {(draft.matchingPairs?.length ?? 0) < MAX_MATCHING_PAIRS && (
-                    <button
-                      onClick={() =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          matchingPairs: [
-                            ...(prev.matchingPairs ?? []),
-                            { left: "", right: "" },
-                          ],
-                        }))
-                      }
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      + Add another pair
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 mt-4">
-                Explanation (optional)
-              </label>
-              <textarea
-                value={draft.explanation ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    explanation: e.target.value,
-                  }))
-                }
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                rows={2}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-              <button
-                onClick={cancelEdit}
-                className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pendingDeleteQuestion && (
-        <DeleteConfirmModal
-          title="Delete Question"
-          message="This question will also be removed from any quiz that references it."
-          itemName={pendingDeleteQuestion.question}
-          onConfirm={confirmRemoveQuestion}
-          onCancel={() => setPendingDeleteQuestion(null)}
-          isDeleting={deletingQuestion}
-        />
-      )}
+      {deleteQuestionModal}
     </div>
   );
 }

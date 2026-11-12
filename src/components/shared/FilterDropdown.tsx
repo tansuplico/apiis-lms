@@ -59,7 +59,7 @@ export default function FilterDropdown({
         />
       </button>
       {open && (
-        <div className="absolute z-10 mt-1 min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden py-1">
+        <div className="absolute z-10 mt-1 min-w-full max-h-72 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1">
           {options.map((o) => (
             <button
               key={o.value}

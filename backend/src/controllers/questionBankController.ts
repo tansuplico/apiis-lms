@@ -6,6 +6,7 @@ import {
   validateQuestionShape,
   buildQuestionData,
   mapQuestionData,
+  normalizeCategories,
 } from "../utils/quizQuestions";
 
 // Shared shape for a bank row → API response, used by all three handlers
@@ -13,6 +14,10 @@ import {
 function mapBankRow(row: any) {
   return {
     ...mapQuestionData(row.id, row.question_data),
+    // Category tags live in the question's JSON; older questions have none.
+    categories: Array.isArray(row.question_data?.categories)
+      ? row.question_data.categories
+      : [],
     collectionId: row.collection_id,
     createdById: row.created_by_id,
     createdByRole: row.created_by_role,
@@ -20,6 +25,57 @@ function mapBankRow(row: any) {
     updatedAt: row.updated_at,
   };
 }
+
+// ── Category tags in use across the whole library, grouped without regard to
+// case ("fractions" and "Fractions" are one category). `name` is one of the
+// spellings in use. When saving a question, pass its id as excludeQuestionId
+// so the question's own current tags don't pin the spelling of the tags it is
+// being changed to.
+async function loadLibraryCategories(
+  excludeQuestionId?: number,
+): Promise<{ name: string; count: number }[]> {
+  const result = await pool.query(
+    `SELECT MIN(tag) AS name, COUNT(*)::int AS count
+     FROM question_bank qb
+     CROSS JOIN LATERAL jsonb_array_elements_text(
+       CASE WHEN jsonb_typeof(qb.question_data::jsonb -> 'categories') = 'array'
+            THEN qb.question_data::jsonb -> 'categories'
+            ELSE '[]'::jsonb END
+     ) AS tag
+     WHERE ($1::int IS NULL OR qb.id <> $1)
+     GROUP BY LOWER(tag)
+     ORDER BY LOWER(tag)`,
+    [excludeQuestionId ?? null],
+  );
+  return result.rows;
+}
+
+// Reuse the spelling already in the library for a tag that differs only in
+// case, so "fractions" typed later doesn't create a second "Fractions".
+async function canonicalizeCategories(
+  categories: string[],
+  excludeQuestionId?: number,
+): Promise<string[]> {
+  if (categories.length === 0) return categories;
+  const library = await loadLibraryCategories(excludeQuestionId);
+  const spelling = new Map(library.map((c) => [c.name.toLowerCase(), c.name]));
+  return categories.map((c) => spelling.get(c.toLowerCase()) ?? c);
+}
+
+// ── Category tags in use, with how many questions carry each (for the tag
+// input's suggestions).
+export const getBankCategories = async (_req: Request, res: Response) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: "OK",
+      data: await loadLibraryCategories(),
+    });
+  } catch (err) {
+    console.error("getBankCategories error:", err);
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+};
 
 // ── List bank questions. Optionally filtered to one collection via
 // ?collectionId= (used by the quiz editor's picker, which browses one
@@ -50,13 +106,11 @@ export const getQuestionBank = async (req: Request, res: Response) => {
       params,
     );
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "OK",
-        data: result.rows.map(mapBankRow),
-      });
+    res.status(200).json({
+      success: true,
+      message: "OK",
+      data: result.rows.map(mapBankRow),
+    });
   } catch (err) {
     console.error("getQuestionBank error:", err);
     res.status(500).json({ success: false, message: "Server error." });
@@ -83,12 +137,19 @@ export const createBankQuestion = async (req: Request, res: Response) => {
       return;
     }
 
+    const normalized = normalizeCategories(q.categories);
+    if ("error" in normalized) {
+      res.status(400).json({ success: false, message: normalized.error });
+      return;
+    }
+    const categories = await canonicalizeCategories(normalized.categories);
+
     const result = await pool.query(
       `INSERT INTO question_bank (question_data, collection_id, created_by_id, created_by_role)
        VALUES ($1, $2, $3, $4)
        RETURNING id, question_data, collection_id, created_by_id, created_by_role, created_at, updated_at`,
       [
-        JSON.stringify(buildQuestionData(q)),
+        JSON.stringify({ ...buildQuestionData(q), categories }),
         collectionId,
         authReq.user!.id,
         authReq.user!.role,
@@ -141,11 +202,44 @@ export const updateBankQuestion = async (req: Request, res: Response) => {
       return;
     }
 
+    const existing = await pool.query(
+      `SELECT question_data FROM question_bank WHERE id = $1`,
+      [id],
+    );
+    if (existing.rows.length === 0) {
+      res
+        .status(404)
+        .json({ success: false, message: "Bank question not found." });
+      return;
+    }
+
+    // A request that doesn't mention categories (e.g. an older app version)
+    // keeps the question's current tags instead of wiping them.
+    let categories: string[];
+    if (q.categories === undefined) {
+      const stored = existing.rows[0].question_data?.categories;
+      categories = Array.isArray(stored) ? stored : [];
+    } else {
+      const normalized = normalizeCategories(q.categories);
+      if ("error" in normalized) {
+        res.status(400).json({ success: false, message: normalized.error });
+        return;
+      }
+      categories = await canonicalizeCategories(
+        normalized.categories,
+        Number(id),
+      );
+    }
+
     const result = await pool.query(
       `UPDATE question_bank SET question_data = $1, collection_id = $2, updated_at = NOW()
        WHERE id = $3
        RETURNING id, question_data, collection_id, created_by_id, created_by_role, created_at, updated_at`,
-      [JSON.stringify(buildQuestionData(q)), collectionId, id],
+      [
+        JSON.stringify({ ...buildQuestionData(q), categories }),
+        collectionId,
+        id,
+      ],
     );
 
     if (result.rows.length === 0) {

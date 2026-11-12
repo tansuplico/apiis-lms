@@ -238,11 +238,28 @@ export interface PersonalInfoProps {
 
 export type BankQuestion = Omit<QuizQuestion, "bankQuestionId"> & {
   collectionId: number;
+  // Category tags that cut across collections; [] when a question has none.
+  categories: string[];
   createdById: number;
   createdByRole: "admin" | "facilitator";
   createdAt: string;
   updatedAt: string;
 };
+
+// What the client sends to create/update a bank question. `categories` is
+// optional: when omitted on update, the server keeps the existing tags.
+export type BankQuestionInput = Omit<
+  BankQuestion,
+  | "id"
+  | "createdById"
+  | "createdByRole"
+  | "createdAt"
+  | "updatedAt"
+  | "categories"
+> & { categories?: string[] };
+
+// A category tag in use across the library, and how many questions carry it.
+export type BankCategory = { name: string; count: number };
 
 export type QuizBankCollection = {
   id: number;

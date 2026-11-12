@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import { BankQuestion } from "@/types/types";
+import { BankCategory, BankQuestion, BankQuestionInput } from "@/types/types";
 
 export const questionBankService = {
   getAll: async (collectionId?: number): Promise<BankQuestion[]> => {
@@ -10,12 +10,15 @@ export const questionBankService = {
     return response.data ?? [];
   },
 
-  create: async (
-    question: Omit<
-      BankQuestion,
-      "id" | "createdById" | "createdByRole" | "createdAt" | "updatedAt"
-    >,
-  ): Promise<BankQuestion> => {
+  // Category tags in use across the whole library (for tag suggestions).
+  getCategories: async (): Promise<BankCategory[]> => {
+    const response = await apiClient.get<BankCategory[]>(
+      "/question-bank/categories",
+    );
+    return response.data ?? [];
+  },
+
+  create: async (question: BankQuestionInput): Promise<BankQuestion> => {
     const response = await apiClient.post<BankQuestion>(
       "/question-bank",
       question,
@@ -25,10 +28,7 @@ export const questionBankService = {
 
   update: async (
     id: number,
-    question: Omit<
-      BankQuestion,
-      "id" | "createdById" | "createdByRole" | "createdAt" | "updatedAt"
-    >,
+    question: BankQuestionInput,
   ): Promise<BankQuestion> => {
     const response = await apiClient.put<BankQuestion>(
       `/question-bank/${id}`,

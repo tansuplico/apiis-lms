@@ -5,6 +5,10 @@ import pool from "../config/db";
 export const MAX_QUIZ_OPTIONS = 6;
 export const MAX_MATCHING_PAIRS = 6;
 export const MAX_IDENTIFICATION_ANSWERS = 10;
+export const MAX_CATEGORIES_PER_QUESTION = 5;
+export const MAX_CATEGORY_LENGTH = 30;
+// Refuse absurd payloads before doing any per-tag work.
+const MAX_CATEGORIES_INPUT = 20;
 export const QUESTION_IMAGE_REGEX =
   /^(https?:\/\/.+|\/api\/.+|data:image\/(jpeg|png|webp|gif);base64,.+)/;
 export const MAX_QUESTION_IMAGE_SIZE = 1.5 * 1024 * 1024;
@@ -107,6 +111,46 @@ export function validateQuestionShape(q: any, index: number): string | null {
   }
 
   return null;
+}
+
+/**
+ * Cleans a bank question's category tags: collapses whitespace, drops empty
+ * tags and removes duplicates regardless of case (the first spelling wins).
+ * Returns an error message instead if the input isn't a sensible tag list.
+ */
+export function normalizeCategories(
+  input: unknown,
+): { categories: string[] } | { error: string } {
+  if (input === null || input === undefined) return { categories: [] };
+  if (!Array.isArray(input) || input.length > MAX_CATEGORIES_INPUT) {
+    return { error: "Categories must be a short list of text tags." };
+  }
+
+  const categories: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") {
+      return { error: "Categories must be text." };
+    }
+    const tag = raw
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!tag) continue;
+    if (tag.length > MAX_CATEGORY_LENGTH) {
+      return {
+        error: `Each category can be at most ${MAX_CATEGORY_LENGTH} characters.`,
+      };
+    }
+    if (categories.some((c) => c.toLowerCase() === tag.toLowerCase())) continue;
+    categories.push(tag);
+  }
+
+  if (categories.length > MAX_CATEGORIES_PER_QUESTION) {
+    return {
+      error: `A question can have at most ${MAX_CATEGORIES_PER_QUESTION} categories.`,
+    };
+  }
+  return { categories };
 }
 
 /** Builds the question_data JSON to persist, trimming/normalizing per type. */
