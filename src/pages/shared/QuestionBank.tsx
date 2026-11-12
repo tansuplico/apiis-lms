@@ -27,8 +27,11 @@ import {
 } from "@/types/types";
 import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
-import { authHeaders } from "@/services/authHeadersService";
-import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
+import {
+  contentImageService,
+  questionImageError,
+} from "@/services/contentImageService";
+import { resolveApiUrl } from "@/utils/imageUtils";
 import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkeleton";
 import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
@@ -223,6 +226,7 @@ export default function QuestionBank() {
     emptyDraft("multiple_choice", 0),
   );
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   // Only show field-level error highlighting after a failed save attempt,
   // not while the person is still filling the form in for the first time.
   const [attemptedSave, setAttemptedSave] = useState(false);
@@ -494,34 +498,24 @@ export default function QuestionBank() {
       return { ...prev, options, correctOptionIndex };
     });
 
+  // Uploads first and stores the returned /api/... path, so large images
+  // don't hit the server's limit on inline (base64) image strings.
   const handleImageUpload = async (file: File) => {
-    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
-      toast.error("Only JPEG, PNG, WebP, and GIF images are allowed.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be smaller than 5MB.");
+    const invalid = questionImageError(file);
+    if (invalid) {
+      toast.error(invalid);
       return;
     }
 
-    const headers = await authHeaders();
-    const formData = new FormData();
-    formData.append("image", file);
-    fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
-      method: "POST",
-      headers,
-      body: formData,
-    })
-      .then((res) => {
-        if (res.status === 401) handleUnauthorizedResponse(res.status);
-      })
-      .catch(() => {});
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDraft((prev) => ({ ...prev, imageUrl: reader.result as string }));
-    };
-    reader.onerror = () => toast.error("Failed to read image file.");
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+    try {
+      const url = await contentImageService.upload(file);
+      setDraft((prev) => ({ ...prev, imageUrl: url }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const save = async () => {
@@ -699,7 +693,7 @@ export default function QuestionBank() {
           </p>
           {q.imageUrl && (
             <img
-              src={q.imageUrl}
+              src={resolveApiUrl(q.imageUrl)}
               alt="Question"
               className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
             />
@@ -855,7 +849,7 @@ export default function QuestionBank() {
             {draft.imageUrl ? (
               <div className="relative inline-block">
                 <img
-                  src={draft.imageUrl}
+                  src={resolveApiUrl(draft.imageUrl)}
                   alt="Question"
                   className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
                 />
@@ -869,13 +863,20 @@ export default function QuestionBank() {
                 </button>
               </div>
             ) : (
-              <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <label
+                className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg dark:border-gray-600 dark:text-gray-200 ${
+                  uploadingImage
+                    ? "opacity-60 cursor-wait"
+                    : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
                 <ImageIcon size={16} />
-                Add image (optional)
+                {uploadingImage ? "Uploading..." : "Add image (optional)"}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   className="hidden"
+                  disabled={uploadingImage}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleImageUpload(file);
@@ -1175,7 +1176,7 @@ export default function QuestionBank() {
           </button>
           <button
             onClick={save}
-            disabled={saving}
+            disabled={saving || uploadingImage}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
           >
             {saving ? "Saving..." : "Save"}

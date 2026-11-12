@@ -28,8 +28,11 @@ import {
   QuizQuestion,
   QuizQuestionType,
 } from "@/types/types";
-import { authHeaders } from "@/services/authHeadersService";
-import { handleUnauthorizedResponse } from "@/services/sessionGuardService";
+import {
+  contentImageService,
+  questionImageError,
+} from "@/services/contentImageService";
+import { resolveApiUrl } from "@/utils/imageUtils";
 import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
 
@@ -316,6 +319,7 @@ export default function CourseQuiz({
   const [questionDraft, setQuestionDraft] = useState<QuizQuestion>(() =>
     defaultQuestion("multiple_choice"),
   );
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [questionAttemptedSave, setQuestionAttemptedSave] = useState(false);
 
   if (!currentModule || !quizPart) {
@@ -438,40 +442,24 @@ export default function CourseQuiz({
       return { ...prev, options, correctOptionIndex };
     });
 
+  // Uploads first and stores the returned /api/... path, so large images
+  // don't hit the server's limit on inline (base64) image strings.
   const handleQuestionDraftImageUpload = async (file: File) => {
-    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
-      toast.error("Only JPEG, PNG, WebP, and GIF images are allowed.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be smaller than 5MB.");
+    const invalid = questionImageError(file);
+    if (invalid) {
+      toast.error(invalid);
       return;
     }
 
-    // Fire-and-forget copy to the server (same pattern as course content
-    // images) — the base64 embed below is what's actually stored/rendered,
-    // so a failure here doesn't block the question image from working.
-    const headers = await authHeaders();
-    const formData = new FormData();
-    formData.append("image", file);
-    fetch(`${import.meta.env.VITE_API_URL}/content-images`, {
-      method: "POST",
-      headers,
-      body: formData,
-    })
-      .then((res) => {
-        if (res.status === 401) handleUnauthorizedResponse(res.status);
-      })
-      .catch(() => {});
-    const reader = new FileReader();
-    reader.onload = () => {
-      setQuestionDraft((prev) => ({
-        ...prev,
-        imageUrl: reader.result as string,
-      }));
-    };
-    reader.onerror = () => toast.error("Failed to read image file.");
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+    try {
+      const url = await contentImageService.upload(file);
+      setQuestionDraft((prev) => ({ ...prev, imageUrl: url }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const saveQuestionDraft = () => {
@@ -640,7 +628,7 @@ export default function CourseQuiz({
                       </p>
                       {q.imageUrl && (
                         <img
-                          src={q.imageUrl}
+                          src={resolveApiUrl(q.imageUrl)}
                           alt="Question"
                           className="max-h-20 mt-2 rounded border border-gray-200 dark:border-gray-600"
                         />
@@ -706,7 +694,7 @@ export default function CourseQuiz({
                       </p>
                       {q.imageUrl && (
                         <img
-                          src={q.imageUrl}
+                          src={resolveApiUrl(q.imageUrl)}
                           alt="Question"
                           className="max-h-16 mt-2 rounded border border-gray-200 dark:border-gray-600"
                         />
@@ -765,7 +753,7 @@ export default function CourseQuiz({
 
                     {q.imageUrl && (
                       <img
-                        src={q.imageUrl}
+                        src={resolveApiUrl(q.imageUrl)}
                         alt="Question"
                         className="max-h-56 rounded border border-gray-200 dark:border-gray-700"
                       />
@@ -1168,7 +1156,7 @@ export default function CourseQuiz({
                               />
                               {bq.imageUrl ? (
                                 <img
-                                  src={bq.imageUrl}
+                                  src={resolveApiUrl(bq.imageUrl)}
                                   alt=""
                                   className="w-10 h-10 rounded object-cover border border-gray-200 dark:border-gray-600 shrink-0"
                                 />
@@ -1325,7 +1313,7 @@ export default function CourseQuiz({
                 {questionDraft.imageUrl ? (
                   <div className="relative inline-block">
                     <img
-                      src={questionDraft.imageUrl}
+                      src={resolveApiUrl(questionDraft.imageUrl)}
                       alt="Question"
                       className="max-h-32 rounded border border-gray-200 dark:border-gray-600"
                     />
@@ -1342,13 +1330,20 @@ export default function CourseQuiz({
                     </button>
                   </div>
                 ) : (
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg cursor-pointer dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <label
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg dark:border-gray-600 dark:text-gray-200 ${
+                      uploadingImage
+                        ? "opacity-60 cursor-wait"
+                        : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
                     <ImageIcon size={16} />
-                    Add image (optional)
+                    {uploadingImage ? "Uploading..." : "Add image (optional)"}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif"
                       className="hidden"
+                      disabled={uploadingImage}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleQuestionDraftImageUpload(file);
@@ -1642,7 +1637,8 @@ export default function CourseQuiz({
               </button>
               <button
                 onClick={saveQuestionDraft}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                disabled={uploadingImage}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
               >
                 {questionModalId === "new" ? "Add Question" : "Save"}
               </button>

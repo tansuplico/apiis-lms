@@ -14,6 +14,7 @@ import {
 import { toast } from "react-toastify";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useNextPart } from "@/hooks/useNextPart";
+import { resolveApiUrl } from "@/utils/imageUtils";
 
 const COIN_REWARDS_BY_DIFFICULTY: Record<string, number> = {
   Beginner: 5,
@@ -361,7 +362,7 @@ export default function CourseQuiz() {
 
                   {q.imageUrl && (
                     <img
-                      src={q.imageUrl}
+                      src={resolveApiUrl(q.imageUrl)}
                       alt="Question"
                       className="max-h-64 rounded-lg border border-gray-200 dark:border-gray-700 mb-3"
                     />
