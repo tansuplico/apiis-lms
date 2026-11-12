@@ -13,6 +13,7 @@ import { Upload, Loader2 } from "lucide-react";
 import { tokenStorage } from "@/services/tokenStorage";
 import { extractThumbnailFilename } from "@/utils/thumbnailHelper";
 import { resolveThumbnailUrl } from "@/utils/imageUtils";
+import { saveCourseEdits } from "@/utils/courseEdits";
 
 const BASE_URL = import.meta.env.VITE_API_URL as string;
 
@@ -145,47 +146,19 @@ export default function CoursePreview() {
     });
   };
 
+  // On a partial failure the Cancel snapshot already holds what was saved,
+  // and we stay in edit mode (the store shows the error).
   const saveChanges = async () => {
-    try {
-      const thumbnailUrl = course.thumbnailUrl;
-      const isPersistedThumbnail =
-        thumbnailUrl &&
-        typeof thumbnailUrl === "string" &&
-        !thumbnailUrl.startsWith("data:") &&
-        !thumbnailUrl.startsWith("blob:");
-
-      const thumbnailToSave = isPersistedThumbnail
-        ? thumbnailUrl.startsWith("http")
-          ? new URL(thumbnailUrl).pathname // ← extract /api/thumbnails/uuid.png
-          : thumbnailUrl
-        : null;
-
-      await updateCourse(course.id, {
-        title: course.title,
-        subtitle: course.subtitle,
-        description: course.description,
-        instructor: course.instructor,
-        level: course.level,
-        levelColor: course.levelColor,
-        category: course.category,
-        bgColor: course.bgColor,
-        thumbnailUrl: thumbnailToSave,
-      });
-
-      // ── Persist staged module renames (only modules whose title changed)
-      for (const mod of course.modules) {
-        const original = originalCourse.modules.find((m) => m.id === mod.id);
-        if (original && original.title !== mod.title) {
-          await updateModule(course.id, mod.id, { title: mod.title });
-        }
-      }
-
-      setOriginalCourse(course);
-      setIsEditing(false);
-      toast.success("Course updated.", { position: "bottom-right" });
-    } catch {
-      // Error handled by store
-    }
+    const ok = await saveCourseEdits({
+      course,
+      original: originalCourse,
+      updateCourse,
+      updateModule,
+      onSaved: setOriginalCourse,
+    });
+    if (!ok) return;
+    setIsEditing(false);
+    toast.success("Course updated.", { position: "bottom-right" });
   };
 
   const updateCourseField = <K extends keyof Course>(

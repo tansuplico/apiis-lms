@@ -157,7 +157,7 @@ export default function PreviewContents({
                     if (e.key === "Escape") setEditingModuleIndex(null);
                   }}
                   autoFocus
-                  maxLength={50}
+                  maxLength={100}
                   className="flex-1 text-xl font-bold bg-transparent border-b-2 border-blue-500 focus:outline-none text-gray-900 dark:text-white"
                 />
               ) : (
