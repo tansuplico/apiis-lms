@@ -103,11 +103,17 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         return { coursesFetched: false };
       }
 
-      const [student, progress] = await withNetworkRetry(() =>
-        Promise.all([
-          studentService.getById(payload.id),
-          studentService.getProgress(),
-        ]),
+      // Retry 5xx too: a brief server hiccup shouldn't look like a logout.
+      const [student, progress] = await withNetworkRetry(
+        () =>
+          Promise.all([
+            studentService.getById(payload.id),
+            studentService.getProgress(),
+          ]),
+        2,
+        800,
+        6000,
+        true,
       );
 
       const fullStudent: Student = {

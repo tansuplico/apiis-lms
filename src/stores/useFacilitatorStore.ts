@@ -50,8 +50,13 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
 
       if (!isOnline()) return;
 
-      const facilitator = await withNetworkRetry(() =>
-        facilitatorService.getById(payload.id),
+      // Retry 5xx too: a brief server hiccup shouldn't look like a logout.
+      const facilitator = await withNetworkRetry(
+        () => facilitatorService.getById(payload.id),
+        2,
+        800,
+        6000,
+        true,
       );
       set({ currentFacilitator: facilitator, isAuthenticated: true });
 

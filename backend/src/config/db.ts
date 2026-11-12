@@ -32,7 +32,9 @@ const pool = new Pool({
   ssl: shouldUseSsl() ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  // New connections through Railway's public proxy (local dev) often take
+  // more than 2 s; a short limit turned slow connects into 500s.
+  connectionTimeoutMillis: 10000,
 });
 
 // ── Event handlers

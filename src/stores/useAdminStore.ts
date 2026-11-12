@@ -51,8 +51,13 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
 
       if (!isOnline()) return;
 
-      const admin = await withNetworkRetry(() =>
-        adminService.getById(payload.id),
+      // Retry 5xx too: a brief server hiccup shouldn't look like a logout.
+      const admin = await withNetworkRetry(
+        () => adminService.getById(payload.id),
+        2,
+        800,
+        6000,
+        true,
       );
       set({ currentAdmin: admin, isAuthenticated: true });
 
