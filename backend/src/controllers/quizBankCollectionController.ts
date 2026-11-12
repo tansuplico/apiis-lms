@@ -137,10 +137,51 @@ export const updateCollection = async (req: Request, res: Response) => {
   }
 };
 
+// ── Impact of deleting a collection: how many questions it holds and how
+// many distinct quizzes (quiz parts) use at least one of them. Read-only,
+// so the confirmation dialog can warn before anything is deleted.
+export const getCollectionImpact = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (isNaN(Number(id))) {
+      res.status(400).json({ success: false, message: "Invalid ID." });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT
+        (SELECT COUNT(*)::int FROM question_bank WHERE collection_id = c.id) AS question_count,
+        (SELECT COUNT(DISTINCT qbr.part_id)::int FROM quiz_bank_refs qbr
+          JOIN question_bank qb ON qb.id = qbr.bank_question_id
+          WHERE qb.collection_id = c.id) AS quiz_count
+       FROM quiz_bank_collections c
+       WHERE c.id = $1`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      res
+        .status(404)
+        .json({ success: false, message: "Collection not found." });
+      return;
+    }
+
+    const { question_count, quiz_count } = result.rows[0];
+    res.status(200).json({
+      success: true,
+      message: "OK",
+      data: { questionCount: question_count, quizCount: quiz_count },
+    });
+  } catch (err) {
+    console.error("getCollectionImpact error:", err);
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+};
+
 // ── Delete a collection. Cascades to its questions (ON DELETE CASCADE on
 // question_bank.collection_id), which in turn cascades to quiz_bank_refs —
 // so this can remove content from quizzes several steps removed. We report
-// exactly how much is affected so the confirmation dialog can warn clearly.
+// how many questions and distinct quizzes were affected.
 export const deleteCollection = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -152,9 +193,9 @@ export const deleteCollection = async (req: Request, res: Response) => {
     const impact = await pool.query(
       `SELECT
         (SELECT COUNT(*)::int FROM question_bank WHERE collection_id = $1) AS question_count,
-        (SELECT COUNT(*)::int FROM quiz_bank_refs qbr
+        (SELECT COUNT(DISTINCT qbr.part_id)::int FROM quiz_bank_refs qbr
           JOIN question_bank qb ON qb.id = qbr.bank_question_id
-          WHERE qb.collection_id = $1) AS quiz_ref_count`,
+          WHERE qb.collection_id = $1) AS quiz_count`,
       [id],
     );
 
@@ -170,17 +211,17 @@ export const deleteCollection = async (req: Request, res: Response) => {
       return;
     }
 
-    const { question_count, quiz_ref_count } = impact.rows[0];
+    const { question_count, quiz_count } = impact.rows[0];
     res.status(200).json({
       success: true,
       message:
         question_count > 0
-          ? `Deleted. ${question_count} question(s) and ${quiz_ref_count} quiz reference(s) were removed with it.`
+          ? `Deleted. ${question_count} question(s) were removed, and ${quiz_count} quiz(zes) lost questions.`
           : "Deleted.",
       data: {
         id: Number(id),
         questionsDeleted: question_count,
-        quizzesAffected: quiz_ref_count,
+        quizzesAffected: quiz_count,
       },
     });
   } catch (err) {

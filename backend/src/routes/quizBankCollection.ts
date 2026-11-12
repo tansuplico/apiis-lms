@@ -1,7 +1,8 @@
-// src/routes/quizBankCollections.ts
+// src/routes/quizBankCollection.ts
 import { Router } from "express";
 import {
   getCollections,
+  getCollectionImpact,
   createCollection,
   updateCollection,
   deleteCollection,
@@ -15,6 +16,12 @@ router.get(
   authenticate,
   authorize("admin", "facilitator"),
   getCollections,
+);
+router.get(
+  "/:id/impact",
+  authenticate,
+  authorize("admin", "facilitator"),
+  getCollectionImpact,
 );
 router.post(
   "/",

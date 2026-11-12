@@ -70,6 +70,27 @@ const colorForCollection = (id: number) =>
 
 const SKELETON_COUNT = 6;
 
+// What deleting a collection would affect, fetched when the dialog opens.
+type CollectionImpactState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; questionCount: number; quizCount: number };
+
+const collectionDeleteMessage = (
+  listCount: number,
+  impact: CollectionImpactState,
+): string => {
+  const count = impact.status === "ready" ? impact.questionCount : listCount;
+  const base = `This deletes all ${count} question(s) inside it.`;
+  if (impact.status === "loading")
+    return `${base} Checking which quizzes use them...`;
+  if (impact.status === "error")
+    return `${base} Couldn't check which quizzes use them; any quiz that does will lose them.`;
+  return impact.quizCount === 0
+    ? `${base} No quizzes use them.`
+    : `${base} ${impact.quizCount} quiz(zes) will lose questions.`;
+};
+
 type DraftQuestion = Omit<
   BankQuestion,
   "id" | "createdById" | "createdByRole" | "createdAt" | "updatedAt"
@@ -218,6 +239,29 @@ export default function QuestionBank() {
   const [pendingDeleteCollection, setPendingDeleteCollection] =
     useState<QuizBankCollection | null>(null);
   const [deletingCollection, setDeletingCollection] = useState(false);
+  const [collectionImpact, setCollectionImpact] =
+    useState<CollectionImpactState>({ status: "loading" });
+  // Id of the collection the dialog is open for, so a late impact answer
+  // for a previously opened dialog can't overwrite the current one.
+  const impactFor = useRef<number | null>(null);
+
+  useEffect(() => {
+    const id = pendingDeleteCollection?.id ?? null;
+    impactFor.current = id;
+    // Reset on close too, so the next dialog never shows the last one's
+    // counts for a frame before its own check starts.
+    setCollectionImpact({ status: "loading" });
+    if (id === null) return;
+    quizBankCollectionService
+      .getImpact(id)
+      .then((impact) => {
+        if (impactFor.current === id)
+          setCollectionImpact({ status: "ready", ...impact });
+      })
+      .catch(() => {
+        if (impactFor.current === id) setCollectionImpact({ status: "error" });
+      });
+  }, [pendingDeleteCollection?.id]);
 
   const [pendingDeleteQuestion, setPendingDeleteQuestion] =
     useState<BankQuestion | null>(null);
@@ -1453,7 +1497,10 @@ export default function QuestionBank() {
         {pendingDeleteCollection && (
           <DeleteConfirmModal
             title="Delete Collection"
-            message={`This deletes all ${pendingDeleteCollection.questionCount} question(s) inside it and removes them from any quiz that uses them.`}
+            message={collectionDeleteMessage(
+              pendingDeleteCollection.questionCount,
+              collectionImpact,
+            )}
             itemName={pendingDeleteCollection.name}
             onConfirm={confirmRemoveCollection}
             onCancel={() => setPendingDeleteCollection(null)}

@@ -1,4 +1,4 @@
-// src/services/quizBankCollectionService.ts
+// src/services/bankCollectionService.ts
 import { apiClient } from "./apiClient";
 import { QuizBankCollection } from "@/types/types";
 
@@ -29,6 +29,17 @@ export const quizBankCollectionService = {
       `/quiz-bank-collections/${id}`,
       data,
     );
+    return response.data!;
+  },
+
+  // How many questions the collection holds and how many quizzes use them.
+  getImpact: async (
+    id: number,
+  ): Promise<{ questionCount: number; quizCount: number }> => {
+    const response = await apiClient.get<{
+      questionCount: number;
+      quizCount: number;
+    }>(`/quiz-bank-collections/${id}/impact`);
     return response.data!;
   },
 
