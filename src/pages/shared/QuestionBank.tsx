@@ -32,6 +32,7 @@ import {
   questionImageError,
 } from "@/services/contentImageService";
 import { resolveApiUrl } from "@/utils/imageUtils";
+import { collectCategories, hasCategory } from "@/utils/bankCategories";
 import CollectionGridCardSkeleton from "@/components/ui/CollectionGridCardSkeleton";
 import CollectionListItemSkeleton from "@/components/ui/CollectionListItemSkeleton";
 import BankQuestionSkeleton from "@/components/ui/BankQuestionSkeleton";
@@ -181,21 +182,10 @@ export default function QuestionBank() {
   );
 
   // Categories present in the questions currently loaded, for the filter.
-  const availableCategories = useMemo(() => {
-    const byKey = new Map<
-      string,
-      { key: string; name: string; count: number }
-    >();
-    for (const q of questions) {
-      for (const tag of q.categories ?? []) {
-        const key = tag.toLowerCase();
-        const entry = byKey.get(key);
-        if (entry) entry.count++;
-        else byKey.set(key, { key, name: tag, count: 1 });
-      }
-    }
-    return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [questions]);
+  const availableCategories = useMemo(
+    () => collectCategories(questions),
+    [questions],
+  );
 
   // If the selected category disappears (e.g. its last question was edited),
   // fall back to showing everything instead of an empty list.
@@ -212,9 +202,7 @@ export default function QuestionBank() {
     const query = searchQuery.trim().toLowerCase();
     return questions.filter((q) => {
       const matchesType = typeFilter === "all" || q.type === typeFilter;
-      const matchesCategory =
-        categoryFilter === "all" ||
-        (q.categories ?? []).some((c) => c.toLowerCase() === categoryFilter);
+      const matchesCategory = hasCategory(q, categoryFilter);
       const matchesQuery =
         query.length === 0 || q.question.toLowerCase().includes(query);
       return matchesType && matchesCategory && matchesQuery;

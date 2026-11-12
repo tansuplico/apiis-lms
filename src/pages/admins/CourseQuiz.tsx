@@ -1,6 +1,6 @@
 // src/pages/admins/CourseQuiz.tsx
 import { useParams, useOutletContext } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -18,6 +18,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  Tag,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -35,6 +36,8 @@ import {
 import { resolveApiUrl } from "@/utils/imageUtils";
 import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
+import { collectCategories, hasCategory } from "@/utils/bankCategories";
+import FilterDropdown from "@/components/shared/FilterDropdown";
 
 // ── Types
 interface CourseQuizProps {
@@ -206,10 +209,12 @@ export default function CourseQuiz({
     }
   };
 
-  // ── Question bank picker (browse a collection, add questions from it)
+  // ── Question bank picker (browse a collection, or all of them, and add
+  // questions from it)
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
-  const [activeBankCollection, setActiveBankCollection] =
-    useState<QuizBankCollection | null>(null);
+  const [activeBankCollection, setActiveBankCollection] = useState<
+    QuizBankCollection | "all" | null
+  >(null);
   const [bankQuestions, setBankQuestions] = useState<BankQuestion[]>([]);
   const [bankQuestionsLoading, setBankQuestionsLoading] = useState(false);
   const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(
@@ -217,6 +222,11 @@ export default function CourseQuiz({
   );
   const [bankCollectionSearch, setBankCollectionSearch] = useState("");
   const [bankQuestionSearch, setBankQuestionSearch] = useState("");
+  // Lower-cased category name, or "all".
+  const [bankCategoryFilter, setBankCategoryFilter] = useState("all");
+  // Only the newest load may fill the list, so a slow earlier load can't
+  // replace the questions of a collection picked after it.
+  const bankLoadId = useRef(0);
 
   const openBankPicker = () => {
     setBankPickerOpen(true);
@@ -225,6 +235,7 @@ export default function CourseQuiz({
     setSelectedBankIds(new Set());
     setBankCollectionSearch("");
     setBankQuestionSearch("");
+    setBankCategoryFilter("all");
     loadBankCollections();
   };
 
@@ -235,23 +246,34 @@ export default function CourseQuiz({
     setSelectedBankIds(new Set());
     setBankCollectionSearch("");
     setBankQuestionSearch("");
+    setBankCategoryFilter("all");
   };
 
-  const selectBankCollection = async (c: QuizBankCollection) => {
+  const selectBankCollection = async (c: QuizBankCollection | "all") => {
+    const loadId = ++bankLoadId.current;
     setActiveBankCollection(c);
     setSelectedBankIds(new Set());
     setBankQuestionSearch("");
+    setBankCategoryFilter("all");
     setBankQuestionsLoading(true);
     try {
-      const data = await questionBankService.getAll(c.id);
+      const data = await questionBankService.getAll(
+        c === "all" ? undefined : c.id,
+      );
+      if (loadId !== bankLoadId.current) return;
       const alreadyAdded = new Set(
         questions.filter((q) => q.bankQuestionId).map((q) => q.bankQuestionId),
       );
       setBankQuestions(data.filter((bq) => !alreadyAdded.has(bq.id)));
     } catch {
-      toast.error("Failed to load questions in this collection.");
+      if (loadId !== bankLoadId.current) return;
+      toast.error(
+        c === "all"
+          ? "Failed to load questions."
+          : "Failed to load questions in this collection.",
+      );
     } finally {
-      setBankQuestionsLoading(false);
+      if (loadId === bankLoadId.current) setBankQuestionsLoading(false);
     }
   };
 
@@ -268,8 +290,35 @@ export default function CourseQuiz({
     c.name.toLowerCase().includes(bankCollectionSearch.trim().toLowerCase()),
   );
 
-  const filteredBankQuestions = bankQuestions.filter((bq) =>
-    bq.question.toLowerCase().includes(bankQuestionSearch.trim().toLowerCase()),
+  const showAllCollectionsEntry =
+    bankCollections.length > 0 &&
+    "all collections".includes(bankCollectionSearch.trim().toLowerCase());
+  const totalBankQuestionCount = bankCollections.reduce(
+    (sum, c) => sum + c.questionCount,
+    0,
+  );
+
+  const bankCategoryOptions = useMemo(
+    () => collectCategories(bankQuestions),
+    [bankQuestions],
+  );
+
+  // If the selected category disappears, fall back to showing everything.
+  useEffect(() => {
+    if (
+      bankCategoryFilter !== "all" &&
+      !bankCategoryOptions.some((c) => c.key === bankCategoryFilter)
+    ) {
+      setBankCategoryFilter("all");
+    }
+  }, [bankCategoryOptions, bankCategoryFilter]);
+
+  const filteredBankQuestions = bankQuestions.filter(
+    (bq) =>
+      hasCategory(bq, bankCategoryFilter) &&
+      bq.question
+        .toLowerCase()
+        .includes(bankQuestionSearch.trim().toLowerCase()),
   );
 
   const allFilteredSelected =
@@ -1049,17 +1098,48 @@ export default function CourseQuiz({
                       No collections yet. Create one from the Question Bank page
                       first.
                     </p>
-                  ) : filteredBankCollections.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 p-2">
-                      No collections match &ldquo;{bankCollectionSearch}
-                      &rdquo;.
-                    </p>
                   ) : (
+                    <>
+                      {showAllCollectionsEntry && (
+                        <button
+                          onClick={() => selectBankCollection("all")}
+                          className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left ${
+                            activeBankCollection === "all"
+                              ? "bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-300 dark:ring-purple-700"
+                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          <Library
+                            size={14}
+                            className="shrink-0 text-purple-600 dark:text-purple-400"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-gray-900 dark:text-white truncate">
+                              All collections
+                            </span>
+                            <span className="block text-xs text-gray-400 dark:text-gray-500">
+                              {totalBankQuestionCount} question
+                              {totalBankQuestionCount === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                        </button>
+                      )}
+                      {filteredBankCollections.length === 0 &&
+                      !showAllCollectionsEntry ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 p-2">
+                          No collections match &ldquo;{bankCollectionSearch}
+                          &rdquo;.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                  {!bankCollectionsLoading &&
                     filteredBankCollections.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => selectBankCollection(c)}
                         className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left ${
+                          activeBankCollection !== "all" &&
                           activeBankCollection?.id === c.id
                             ? "bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-300 dark:ring-purple-700"
                             : "hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -1079,8 +1159,7 @@ export default function CourseQuiz({
                           </span>
                         </span>
                       </button>
-                    ))
-                  )}
+                    ))}
                 </div>
               </div>
 
@@ -1106,10 +1185,38 @@ export default function CourseQuiz({
                           onChange={(e) =>
                             setBankQuestionSearch(e.target.value)
                           }
-                          placeholder={`Search in ${activeBankCollection.name}...`}
+                          placeholder={
+                            activeBankCollection === "all"
+                              ? "Search all collections..."
+                              : `Search in ${activeBankCollection.name}...`
+                          }
                           className="w-full pl-8 pr-2 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         />
                       </div>
+                      {bankCategoryOptions.length > 0 && (
+                        <FilterDropdown
+                          value={bankCategoryFilter}
+                          onChange={setBankCategoryFilter}
+                          options={[
+                            { value: "all", label: "All categories" },
+                            ...bankCategoryOptions.map((c) => ({
+                              value: c.key,
+                              label: `${c.name} (${c.count})`,
+                            })),
+                          ]}
+                          icon={
+                            <Tag
+                              size={14}
+                              className={
+                                bankCategoryFilter !== "all"
+                                  ? "text-white"
+                                  : "text-gray-500 dark:text-gray-400"
+                              }
+                            />
+                          }
+                          active={bankCategoryFilter !== "all"}
+                        />
+                      )}
                       {filteredBankQuestions.length > 0 && (
                         <button
                           onClick={toggleSelectAllFiltered}
@@ -1127,14 +1234,19 @@ export default function CourseQuiz({
                         </p>
                       ) : bankQuestions.length === 0 ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {activeBankCollection.questionCount === 0
-                            ? "This collection has no questions yet. Add some from the Question Bank page."
-                            : "Every question in this collection is already in this quiz."}
+                          {activeBankCollection === "all"
+                            ? totalBankQuestionCount === 0
+                              ? "The question bank is empty."
+                              : "Every bank question is already in this quiz."
+                            : activeBankCollection.questionCount === 0
+                              ? "This collection has no questions yet. Add some from the Question Bank page."
+                              : "Every question in this collection is already in this quiz."}
                         </p>
                       ) : filteredBankQuestions.length === 0 ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          No questions match &ldquo;{bankQuestionSearch}
-                          &rdquo;.
+                          {bankQuestionSearch.trim()
+                            ? `No questions match “${bankQuestionSearch}”.`
+                            : "No questions in this category."}
                         </p>
                       ) : (
                         filteredBankQuestions.map((bq) => {
@@ -1176,6 +1288,25 @@ export default function CourseQuiz({
                                 <p className="text-sm text-gray-900 dark:text-white line-clamp-2">
                                   {bq.question}
                                 </p>
+                                {(bq.categories ?? []).length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {(bq.categories ?? []).map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="text-[11px] px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {activeBankCollection === "all" && (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
+                                    {bankCollections.find(
+                                      (c) => c.id === bq.collectionId,
+                                    )?.name ?? ""}
+                                  </p>
+                                )}
                               </div>
                             </label>
                           );
