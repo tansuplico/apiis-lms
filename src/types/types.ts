@@ -278,8 +278,9 @@ interface CenterGradebookModuleResult {
   moduleWeight: number | null;
   hasQuiz: boolean;
   attempted: boolean;
-  totalQuestions: number;
-  correctAnswers: number;
+  // Quiz points (a matching question earns one per pair).
+  earnedPoints: number;
+  maxPoints: number;
   score: number | null;
   passed: boolean | null;
   coinsAwarded: number;

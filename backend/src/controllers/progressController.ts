@@ -159,6 +159,8 @@ function buildStudentGradebook(
         attempted: false,
         totalQuestions: 0,
         correctAnswers: 0,
+        earnedPoints: 0,
+        maxPoints: 0,
         score: null,
         passed: null,
         coinsAwarded: 0,
@@ -169,8 +171,9 @@ function buildStudentGradebook(
 
     const questions = questionsByPartId.get(quizPartId) ?? [];
     const numQuestions = questions.length;
-    // totalQuestions / correctAnswers in the response now carry POINTS (see
-    // scoreAnswer): identical to question counts unless a quiz has matching.
+    // Points per scoreAnswer (a matching question earns one per pair).
+    // totalQuestions / correctAnswers (and totalCorrect) are kept for older
+    // app versions; same values as maxPoints / earnedPoints (and the totals).
     const maxPoints = questions.reduce(
       (sum, q) => sum + scoreAnswer(q.question_data, undefined).possible,
       0,
@@ -185,6 +188,8 @@ function buildStudentGradebook(
         attempted: false,
         totalQuestions: 0,
         correctAnswers: 0,
+        earnedPoints: 0,
+        maxPoints: 0,
         score: null,
         passed: null,
         coinsAwarded: 0,
@@ -206,6 +211,8 @@ function buildStudentGradebook(
         attempted: false,
         totalQuestions: maxPoints,
         correctAnswers: 0,
+        earnedPoints: 0,
+        maxPoints,
         score: 0,
         passed: false,
         coinsAwarded: 0,
@@ -238,6 +245,8 @@ function buildStudentGradebook(
       attempted: true,
       totalQuestions: maxPoints,
       correctAnswers: correct,
+      earnedPoints: correct,
+      maxPoints,
       score,
       passed,
       coinsAwarded: studentAnswer.coins_awarded ?? 0,
@@ -307,6 +316,8 @@ function buildStudentGradebook(
     overallPassed: overallScore >= 75,
     totalQuestions,
     totalCorrect,
+    totalEarnedPoints: totalCorrect,
+    totalMaxPoints: totalQuestions,
   };
 }
 
@@ -1041,6 +1052,8 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
       overallPassed,
       totalQuestions,
       totalCorrect,
+      totalEarnedPoints,
+      totalMaxPoints,
     } = buildStudentGradebook(
       modulesResult.rows,
       quizPartByModuleId,
@@ -1061,6 +1074,8 @@ export const getStudentGradebook = async (req: AuthRequest, res: Response) => {
         overallPassed,
         totalQuestions,
         totalCorrect,
+        totalEarnedPoints,
+        totalMaxPoints,
         modules: gradebook,
       },
     });

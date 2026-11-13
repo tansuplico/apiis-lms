@@ -222,7 +222,7 @@ export default function CenterGradebookOverview({
                       : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
-                  Raw Score
+                  Points
                 </button>
               </div>
 
@@ -436,7 +436,7 @@ export default function CenterGradebookOverview({
                             ) : mod.attempted ? (
                               <span className="text-sm font-medium text-gray-900 dark:text-white">
                                 {scoreDisplay === "raw"
-                                  ? `${mod.correctAnswers}/${mod.totalQuestions}`
+                                  ? `${mod.earnedPoints}/${mod.maxPoints}`
                                   : `${mod.score}%`}
                               </span>
                             ) : (
