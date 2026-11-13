@@ -22,6 +22,7 @@ import {
   syncPendingQuizAnswers,
 } from "@/services/offlineProgressService";
 import { navigateTo } from "@/services/navigationService";
+import { clearLastPage } from "@/services/lastPageService";
 import { ApiError } from "@/services/apiClient";
 import { withNetworkRetry } from "@/services/networkRetryService";
 
@@ -262,6 +263,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
     await studentService.logout();
     await clearLocalSession();
     set({ currentStudent: null, isAuthenticated: false });
+    await clearLastPage(); // a deliberate logout starts fresh next time
     navigateTo("/student/login");
   },
 

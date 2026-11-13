@@ -21,7 +21,8 @@ export default function CoursePreview() {
   // ── Routing & store
   const location = useLocation();
   const navigate = useNavigate();
-  const { courseId } = useParams();
+  // The route param is named courseName but holds the course id.
+  const { courseName: courseId } = useParams();
   const { courses, updateCourse, updateModule, deleteCourse } =
     useCourseStore();
 

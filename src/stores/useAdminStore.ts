@@ -10,6 +10,7 @@ import { useStudentListStore } from "./useStudentListStore";
 import { useFacilitatorListStore } from "./useFacilitatorListStore";
 import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
+import { clearLastPage } from "@/services/lastPageService";
 import { ApiError } from "@/services/apiClient";
 import { useTicketStore } from "./useTicketStore";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
@@ -102,6 +103,7 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
   logout: async () => {
     await adminService.logout();
     set({ currentAdmin: null });
+    await clearLastPage(); // a deliberate logout starts fresh next time
     navigateTo("/facilitator-admin/login");
   },
 

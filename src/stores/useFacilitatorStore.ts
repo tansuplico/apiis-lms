@@ -9,6 +9,7 @@ import { useCourseStore } from "./useCourseStore";
 import { useStudentListStore } from "./useStudentListStore";
 import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
+import { clearLastPage } from "@/services/lastPageService";
 import { ApiError } from "@/services/apiClient";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 import { isOnline } from "@/services/networkStatus";
@@ -101,6 +102,7 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
   logout: async () => {
     await facilitatorService.logout();
     set({ currentFacilitator: null, isAuthenticated: false });
+    await clearLastPage(); // a deliberate logout starts fresh next time
     navigateTo("/facilitator-admin/login");
   },
 

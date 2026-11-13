@@ -4,12 +4,20 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
   useNavigate,
 } from "react-router-dom";
 import "./App.css";
 
 import { useEffect, useState } from "react";
-import { setNavigate } from "./services/navigationService";
+import { navigateTo, setNavigate } from "./services/navigationService";
+import {
+  isRememberablePath,
+  loadLastPage,
+  pickRestoreTarget,
+  saveLastPage,
+} from "./services/lastPageService";
+import type { Role } from "./types/types";
 
 import { useAdminStore } from "./stores/useAdminStore";
 import { useStudentStore } from "./stores/useStudentStore";
@@ -78,6 +86,34 @@ function NavigationRegistrar() {
   useEffect(() => {
     setNavigate(navigate);
   }, [navigate]);
+  return null;
+}
+
+// ── Helper: the signed-in user, whichever role it is
+function currentSessionUser(): { role: Role; userId: number } | null {
+  const admin = useAdminStore.getState().currentAdmin;
+  if (admin) return { role: "admin", userId: admin.id };
+  const facilitator = useFacilitatorStore.getState().currentFacilitator;
+  if (facilitator) return { role: "facilitator", userId: facilitator.id };
+  const student = useStudentStore.getState().currentStudent;
+  if (student) return { role: "student", userId: student.id };
+  return null;
+}
+
+// ── Sub‑component: RememberLastPage
+// Saves the page on every navigation (so a crash loses nothing), but only
+// once startup is done, so the startup redirect can't overwrite the page
+// that is about to be restored.
+function RememberLastPage({ active }: { active: boolean }) {
+  const location = useLocation();
+  useEffect(() => {
+    if (!active) return;
+    const user = currentSessionUser();
+    const path = location.pathname + location.search;
+    if (user && isRememberablePath(path, user.role)) {
+      saveLastPage({ ...user, path });
+    }
+  }, [active, location.pathname, location.search]);
   return null;
 }
 
@@ -152,6 +188,14 @@ export default function App() {
 
       await Promise.all(fetches);
 
+      // Reopen the page this user had open when the app was last closed.
+      // Routes only render after this, so the dashboard never flashes.
+      const target = pickRestoreTarget(
+        await loadLastPage(),
+        currentSessionUser(),
+      );
+      if (target) navigateTo(target);
+
       setIsInitialized(true);
     };
     init();
@@ -162,6 +206,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <NavigationRegistrar />
+        <RememberLastPage active={isInitialized} />
         <ScrollToTop />
         <UpdateNotifier />
         {!isInitialized ? (
