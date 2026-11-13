@@ -18,16 +18,14 @@ import {
   saveLastPage,
 } from "./services/lastPageService";
 import type { Role } from "./types/types";
-import { useShopStore } from "./stores/useShopStore";
+import { loadRoleData } from "./services/roleDataService";
+import { hideBootSplash, setBootStatus } from "./utils/bootSplash";
 
 import { useAdminStore } from "./stores/useAdminStore";
 import { useStudentStore } from "./stores/useStudentStore";
 import { useCenterStore } from "./stores/useCenterStore";
 import { useCourseStore } from "./stores/useCourseStore";
-import { useStudentListStore } from "./stores/useStudentListStore";
-import { useFacilitatorListStore } from "./stores/useFacilitatorListStore";
 import { useFacilitatorStore } from "./stores/useFacilitatorStore";
-import { useTicketStore } from "./stores/useTicketStore";
 import { primeNetworkStatus } from "./services/networkStatus";
 import StudentLogin from "@/pages/auth/StudentLogin";
 import FaciAdminLogin from "@/pages/auth/FaciAdminLogin";
@@ -76,7 +74,6 @@ import ChangePassword from "./pages/students/ChangePassword";
 import ScrollToTop from "./components/shared/ScrollToTop";
 import PublicRoute from "./components/shared/PublicRoute";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
-import { useQuizBankCollectionStore } from "./stores/useQuizBankCollectionStore";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ThemeProvider } from "./hooks/useTheme";
 import UpdateNotifier from "./components/shared/UpdateNotifier";
@@ -133,84 +130,53 @@ export default function App() {
   const restoreStudentSession = useStudentStore((s) => s.restoreSession);
   const fetchCenters = useCenterStore((s) => s.fetchCenters);
   const fetchCourses = useCourseStore((s) => s.fetchCourses);
-  const fetchStudents = useStudentListStore((s) => s.fetchStudents);
-  const fetchFacilitators = useFacilitatorListStore((s) => s.fetchFacilitators);
-  const fetchTickets = useTicketStore((s) => s.fetchTickets);
-  const fetchCollections = useQuizBankCollectionStore(
-    (s) => s.fetchCollections,
-  );
 
   // ── State
   const [isInitialized, setIsInitialized] = useState(false);
 
-  useEffect(() => {
-    if (isInitialized) {
-      const loader = document.getElementById("app-loader");
-      if (loader) {
-        loader.classList.add("fade-out");
-        setTimeout(() => loader.remove(), 300);
-      }
-    }
-  }, [isInitialized]);
-
-  // ── Effects: initialize app data
+  // ── Effects: initialize app data (the splash in index.html shows meanwhile)
   useEffect(() => {
     const init = async () => {
       await primeNetworkStatus();
+
       // Group 1: restore all sessions in parallel
+      setBootStatus("Signing you in…");
       const [, , studentRestoreResult] = await Promise.all([
         restoreAdminSession(),
         restoreFacilitatorSession(),
         restoreStudentSession(),
       ]);
 
-      const isAdmin = !!useAdminStore.getState().currentAdmin;
-      const isFacilitator = !!useFacilitatorStore.getState().currentFacilitator;
-      const isStudent = !!useStudentStore.getState().currentStudent;
-      const studentAlreadyFetchedCourses =
-        isStudent && studentRestoreResult?.coursesFetched;
-      const studentAlreadyFetchedCenters =
-        isStudent && studentRestoreResult?.centersFetched;
-
-      // Group 2: all independent — run together
-      const fetches: Promise<any>[] = [];
-
-      if (
-        (isAdmin || isFacilitator || isStudent) &&
-        !studentAlreadyFetchedCourses
-      ) {
-        fetches.push(fetchCourses());
+      // Group 2: everything the signed-in role's screens need
+      const user = currentSessionUser();
+      if (user) setBootStatus("Loading your courses…");
+      if (user && user.role !== "student") {
+        await loadRoleData(user.role, "at startup");
+      } else if (user) {
+        // Students load their data inside the session restore (it also
+        // covers offline); fetch only what it couldn't.
+        const fetches: Promise<unknown>[] = [];
+        if (!studentRestoreResult?.coursesFetched) fetches.push(fetchCourses());
+        if (!studentRestoreResult?.centersFetched) fetches.push(fetchCenters());
+        await Promise.all(fetches);
       }
-      if (
-        (isAdmin || isFacilitator || isStudent) &&
-        !studentAlreadyFetchedCenters
-      ) {
-        fetches.push(fetchCenters());
-      }
-      if (isAdmin || isFacilitator) {
-        // Students load the shop inside their own session restore.
-        fetches.push(useShopStore.getState().fetchItems());
-        fetches.push(fetchStudents());
-        fetches.push(fetchCollections());
-      }
-      if (isAdmin) {
-        fetches.push(fetchFacilitators());
-        fetches.push(fetchTickets());
-      }
-
-      await Promise.all(fetches);
 
       // Reopen the page this user had open when the app was last closed.
       // Routes only render after this, so the dashboard never flashes.
-      const target = pickRestoreTarget(
-        await loadLastPage(),
-        currentSessionUser(),
-      );
+      setBootStatus("Almost ready…");
+      const target = pickRestoreTarget(await loadLastPage(), user);
       if (target) navigateTo(target);
     };
     // Run startup once per app load: in dev, StrictMode calls this effect
     // twice, which used to send every startup request twice.
-    (initPromise ??= init()).then(() => setIsInitialized(true));
+    // If startup ever fails unexpectedly, still show the app (worst case the
+    // login screen) instead of leaving the splash up forever.
+    (initPromise ??= init())
+      .catch((err) => console.error("Startup failed:", err))
+      .finally(() => {
+        setIsInitialized(true);
+        hideBootSplash();
+      });
   }, []);
 
   // ── Render: application routes
@@ -221,16 +187,7 @@ export default function App() {
         <RememberLastPage active={isInitialized} />
         <ScrollToTop />
         <UpdateNotifier />
-        {!isInitialized ? (
-          <div className="min-h-screen flex items-center justify-center bg-white/70 dark:bg-gray-950/70 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl px-11 py-8 flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-600 border-t-blue-600" />
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                Refetching...
-              </p>
-            </div>
-          </div>
-        ) : (
+        {!isInitialized ? null : (
           <ErrorBoundary>
             <Routes>
               {/* Public routes */}

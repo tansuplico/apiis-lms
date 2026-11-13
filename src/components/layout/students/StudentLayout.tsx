@@ -1,7 +1,7 @@
 // src/components/layout/StudentLayout.tsx
 import { ArrowLeft, ArrowRight, Gem, RotateCw, WifiOff } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import StudentSidebar from "./StudentSidebar";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useEffect, useRef, useState } from "react";
@@ -13,24 +13,11 @@ import {
 import { getLastSyncTime } from "@/services/syncService";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
-import { refreshAppData } from "@/services/refreshService";
+import { useRefresh } from "@/hooks/useRefresh";
+import RefreshProgressBar from "@/components/shared/RefreshProgressBar";
 
 export default function StudentLayout() {
-  const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    try {
-      await refreshAppData();
-      toast.success("Refreshed");
-    } catch (err: any) {
-      console.error("refresh failed:", err);
-      toast.error(`Refresh failed: ${err?.message ?? String(err)}`);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const { refreshing, refresh } = useRefresh();
 
   // ── Hooks & Store
   useOfflineSync();
@@ -89,6 +76,7 @@ export default function StudentLayout() {
   // ── Render
   return (
     <>
+      <RefreshProgressBar active={refreshing} />
       <BackgroundDecorationAlt />
       <div className="flex min-h-screen">
         <StudentSidebar />
@@ -124,7 +112,7 @@ export default function StudentLayout() {
                 </button>
 
                 <button
-                  onClick={handleRefresh}
+                  onClick={refresh}
                   disabled={refreshing || !online}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   title={online ? "Refresh" : "Unavailable while offline"}

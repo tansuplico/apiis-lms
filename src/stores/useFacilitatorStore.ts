@@ -14,6 +14,7 @@ import { ApiError } from "@/services/apiClient";
 import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 import { isOnline } from "@/services/networkStatus";
 import { withNetworkRetry } from "@/services/networkRetryService";
+import { loadRoleData } from "@/services/roleDataService";
 
 interface FacilitatorStore {
   currentFacilitator: Facilitator | null;
@@ -81,14 +82,10 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         facilitatorService.login(email, password),
       );
       if (!facilitator.mustChangePassword) {
-        // Independent loads, run together (one wait instead of five).
-        await Promise.all([
-          useShopStore.getState().fetchItems(),
-          useCenterStore.getState().fetchCenters(),
-          useCourseStore.getState().fetchCourses(),
-          useStudentListStore.getState().fetchStudents(),
-          useQuizBankCollectionStore.getState().fetchCollections(),
-        ]);
+        // Everything a facilitator's screens need, loaded together. A failed
+        // load still fails the login, as before.
+        const { errors } = await loadRoleData("facilitator", "during login");
+        if (errors.length) throw errors[0];
       }
       set({ currentFacilitator: facilitator, isAuthenticated: true });
     } finally {

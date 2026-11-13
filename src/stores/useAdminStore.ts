@@ -4,18 +4,12 @@ import { Admin } from "@/types/types";
 import { adminService } from "@/services/adminService";
 import { tokenStorage } from "@/services/tokenStorage";
 import { toast } from "react-toastify";
-import { useCenterStore } from "./useCenterStore";
-import { useCourseStore } from "./useCourseStore";
-import { useStudentListStore } from "./useStudentListStore";
-import { useFacilitatorListStore } from "./useFacilitatorListStore";
-import { useShopStore } from "./useShopStore";
 import { navigateTo } from "@/services/navigationService";
 import { clearLastPage } from "@/services/lastPageService";
 import { ApiError } from "@/services/apiClient";
-import { useTicketStore } from "./useTicketStore";
-import { useQuizBankCollectionStore } from "./useQuizBankCollectionStore";
 import { isOnline } from "@/services/networkStatus";
 import { withNetworkRetry } from "@/services/networkRetryService";
+import { loadRoleData } from "@/services/roleDataService";
 
 interface AdminStore {
   currentAdmin: Admin | null;
@@ -81,16 +75,10 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
       const admin = await withNetworkRetry(() =>
         adminService.login(email, password),
       );
-      // Independent loads, run together (one wait instead of seven).
-      await Promise.all([
-        useShopStore.getState().fetchItems(),
-        useCenterStore.getState().fetchCenters(),
-        useCourseStore.getState().fetchCourses(),
-        useStudentListStore.getState().fetchStudents(),
-        useFacilitatorListStore.getState().fetchFacilitators(),
-        useTicketStore.getState().fetchTickets(),
-        useQuizBankCollectionStore.getState().fetchCollections(),
-      ]);
+      // Everything an admin's screens need, loaded together. A failed load
+      // still fails the login, as before.
+      const { errors } = await loadRoleData("admin", "during login");
+      if (errors.length) throw errors[0];
       set({ currentAdmin: admin, isAuthenticated: true });
     } finally {
       set({ isLoading: false });

@@ -1,44 +1,45 @@
 // src/services/refreshService.ts
-import { isOnline } from "./networkStatus";
 import { syncCoursesInBackground } from "./syncService";
+import { loadRoleData } from "./roleDataService";
+import { useAdminStore } from "@/stores/useAdminStore";
+import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
 import { useStudentStore } from "@/stores/useStudentStore";
-import { useCourseStore } from "@/stores/useCourseStore";
-import { useCenterStore } from "@/stores/useCenterStore";
-import { useShopStore } from "@/stores/useShopStore";
+import type { Role } from "@/types/types";
 
 let inFlight = false;
 
+function signedInRole(): Role | null {
+  if (useAdminStore.getState().currentAdmin) return "admin";
+  if (useFacilitatorStore.getState().currentFacilitator) return "facilitator";
+  if (useStudentStore.getState().currentStudent) return "student";
+  return null;
+}
+
+const messageOf = (err: unknown) =>
+  err instanceof Error ? err.message : String(err);
+
+// The Refresh button: reloads everything the signed-in role's screens use
+// (the same set as startup), all at once, while the page stays usable.
+// Throws if anything failed, so the button can say what.
 export async function refreshAppData(): Promise<void> {
   if (inFlight) return;
+  const role = signedInRole();
+  if (!role) return;
   inFlight = true;
   try {
-    const isStudent = !!useStudentStore.getState().currentStudent;
+    const { coursesFresh, errors } = await loadRoleData(role, "on refresh");
 
-    let fetchedFresh = false;
-    try {
-      fetchedFresh = await useCourseStore.getState().fetchCourses();
-    } catch (err) {
-      console.error("refreshAppData: fetchCourses failed:", err);
-    }
-
-    try {
-      await useCenterStore.getState().fetchCenters();
-    } catch (err) {
-      console.error("refreshAppData: fetchCenters failed:", err);
-    }
-
-    if (isOnline()) {
-      try {
-        await useShopStore.getState().fetchItems();
-      } catch (err) {
-        console.error("refreshAppData: fetchItems failed:", err);
-      }
-    }
-
-    if (isStudent && fetchedFresh) {
-      // Throw as before, so the Refresh button still reports a failed sync.
+    // Students: wait for the offline copy so a failed save is reported.
+    if (role === "student" && coursesFresh) {
       const syncError = await syncCoursesInBackground();
-      if (syncError) throw syncError;
+      if (syncError) errors.push(syncError);
+    }
+
+    if (errors.length === 1) throw new Error(messageOf(errors[0]));
+    if (errors.length > 1) {
+      throw new Error(
+        `${errors.length} items failed: ${messageOf(errors[0])}`,
+      );
     }
   } finally {
     inFlight = false;

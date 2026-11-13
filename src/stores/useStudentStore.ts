@@ -5,15 +5,13 @@ import { studentService } from "@/services/studentService";
 import { tokenStorage } from "@/services/tokenStorage";
 import { toast } from "react-toastify";
 import { useShopStore } from "./useShopStore";
-import { syncCoursesInBackground } from "@/services/syncService";
+import { loadRoleData } from "@/services/roleDataService";
 import { isOnline } from "@/services/networkStatus";
-import { useCourseStore } from "./useCourseStore";
 import {
   clearLocalSession,
   loadLocalSession,
   saveLocalSession,
 } from "@/services/sessionStorage";
-import { useCenterStore } from "./useCenterStore";
 import {
   queueCompletePart,
   queueLastVisited,
@@ -66,32 +64,6 @@ const ALL_LOADED: StudentRestoreResult = {
   centersFetched: true,
 };
 
-// Loads a student's shop, courses and centers at the same time (each was a
-// separate wait before), then saves the courses for offline use in the
-// background when they came fresh from the server. Each failure is logged
-// and doesn't stop the others. (fetchCenters returns early when offline.)
-async function loadStudentData(context: string): Promise<{
-  coursesFresh: boolean;
-}> {
-  const [shop, courses, centers] = await Promise.allSettled([
-    useShopStore.getState().fetchItems(),
-    useCourseStore.getState().fetchCourses(),
-    useCenterStore.getState().fetchCenters(),
-  ]);
-  if (shop.status === "rejected") {
-    console.error(`fetchItems failed ${context}:`, shop.reason);
-  }
-  if (courses.status === "rejected") {
-    console.error(`fetchCourses failed ${context}:`, courses.reason);
-  }
-  if (centers.status === "rejected") {
-    console.error(`fetchCenters failed ${context}:`, centers.reason);
-  }
-  const coursesFresh = courses.status === "fulfilled" && courses.value;
-  if (coursesFresh) void syncCoursesInBackground();
-  return { coursesFresh };
-}
-
 export const useStudentStore = create<StudentStore>()((set, get) => ({
   // ── State
   currentStudent: null,
@@ -104,7 +76,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
       const localStudent = await loadLocalSession();
       if (localStudent) {
         set({ currentStudent: localStudent, isAuthenticated: true });
-        await loadStudentData("restoring from cache");
+        await loadRoleData("student", "restoring from cache");
         return ALL_LOADED;
       }
       return NOTHING_LOADED;
@@ -155,7 +127,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
       // Best-effort secondary data — a failure here must not discard the
       // fresh, correct core identity fetch already committed above.
-      await loadStudentData("during restoreSession");
+      await loadRoleData("student", "during restoreSession");
 
       return ALL_LOADED;
     } catch (err) {
@@ -191,7 +163,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
     try {
       const progress = await studentService.getProgress();
 
-      await loadStudentData("during login");
+      await loadRoleData("student", "during login");
 
       const fullStudent: Student = {
         ...student,

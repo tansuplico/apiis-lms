@@ -1,7 +1,7 @@
 // src/components/layout/FacilitatorLayout.tsx
 import { ArrowLeft, ArrowRight, RotateCw, WifiOff } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import FacilitatorSidebar from "./FacilitatorSidebar";
 import { useEffect, useRef, useState } from "react";
 import { useFacilitatorStore } from "@/stores/useFacilitatorStore";
@@ -11,24 +11,11 @@ import {
   startNetworkPolling,
 } from "@/services/networkStatus";
 import BackgroundDecorationAlt from "@/components/ui/BackgroundDecoration";
-import { refreshAppData } from "@/services/refreshService";
+import { useRefresh } from "@/hooks/useRefresh";
+import RefreshProgressBar from "@/components/shared/RefreshProgressBar";
 
 export default function FacilitatorLayout() {
-  const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    try {
-      await refreshAppData();
-      toast.success("Refreshed");
-    } catch (err: any) {
-      console.error("refresh failed:", err);
-      toast.error(`Refresh failed: ${err?.message ?? String(err)}`);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const { refreshing, refresh } = useRefresh();
 
   // ── Store
   const navigate = useNavigate();
@@ -68,6 +55,7 @@ export default function FacilitatorLayout() {
   // ── Render
   return (
     <>
+      <RefreshProgressBar active={refreshing} />
       <BackgroundDecorationAlt />
       <div className="flex min-h-screen">
         <FacilitatorSidebar />
@@ -101,7 +89,7 @@ export default function FacilitatorLayout() {
               </button>
 
               <button
-                onClick={handleRefresh}
+                onClick={refresh}
                 disabled={refreshing || !online}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 title={online ? "Refresh" : "Unavailable while offline"}
