@@ -42,6 +42,8 @@ import CategoryTagInput from "@/components/shared/CategoryTagInput";
 import { useQuizBankCollectionStore } from "@/stores/useQuizBankCollectionStore";
 import { useSearchParams } from "react-router-dom";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useBankViewer } from "@/hooks/useBankViewer";
+import { canModifyBankItem } from "@/utils/bankOwnership";
 
 const QUESTION_TYPE_LABELS: Record<QuizQuestionType, string> = {
   multiple_choice: "Multiple Choice",
@@ -139,6 +141,9 @@ export default function QuestionBank() {
     fetchCollections,
   } = useQuizBankCollectionStore();
   const online = useOnlineStatus();
+  // Only the creator or an admin can change a collection or question; the
+  // server enforces it, this just hides the buttons.
+  const viewer = useBankViewer();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCollectionId = searchParams.get("collection");
@@ -687,22 +692,24 @@ export default function QuestionBank() {
             />
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => startEdit(q)}
-            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-            title="Edit"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={() => remove(q)}
-            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
+        {canModifyBankItem(viewer, q) && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => startEdit(q)}
+              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              title="Edit"
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              onClick={() => remove(q)}
+              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1349,22 +1356,24 @@ export default function QuestionBank() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1 px-3 py-2 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
-                  <button
-                    onClick={() => startRenameCollection(c)}
-                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                    title="Rename"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => removeCollection(c)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                    title="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
+                {canModifyBankItem(viewer, c) && (
+                  <div className="flex items-center gap-1 px-3 py-2 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                    <button
+                      onClick={() => startRenameCollection(c)}
+                      className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                      title="Rename"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => removeCollection(c)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                      title="Delete"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1397,22 +1406,24 @@ export default function QuestionBank() {
                 <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 hidden sm:inline">
                   {c.questionCount} question{c.questionCount === 1 ? "" : "s"}
                 </span>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => startRenameCollection(c)}
-                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                    title="Rename"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => removeCollection(c)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                    title="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
+                {canModifyBankItem(viewer, c) && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => startRenameCollection(c)}
+                      className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                      title="Rename"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => removeCollection(c)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                      title="Delete"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1513,13 +1524,15 @@ export default function QuestionBank() {
             </p>
           )}
         </div>
-        <button
-          onClick={startCreate}
-          className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
-        >
-          <Plus size={20} />
-          Add Question
-        </button>
+        {canModifyBankItem(viewer, activeCollection) && (
+          <button
+            onClick={startCreate}
+            className="flex items-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md text-md transition-all shrink-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+          >
+            <Plus size={20} />
+            Add Question
+          </button>
+        )}
       </div>
 
       {questionFilters}

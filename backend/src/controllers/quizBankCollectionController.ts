@@ -2,6 +2,32 @@
 import { Request, Response } from "express";
 import pool from "../config/db";
 import { AuthRequest } from "../middleware/auth";
+import {
+  canModifyBankItem,
+  COLLECTION_FORBIDDEN,
+} from "../utils/bankOwnership";
+
+// Looks up a collection's creator and answers 404 (missing) or 403 (not
+// yours). Returns true when the caller may change it.
+async function checkCollectionOwner(
+  req: Request,
+  res: Response,
+  id: number,
+): Promise<boolean> {
+  const owner = await pool.query(
+    `SELECT created_by_id, created_by_role FROM quiz_bank_collections WHERE id = $1`,
+    [id],
+  );
+  if (owner.rows.length === 0) {
+    res.status(404).json({ success: false, message: "Collection not found." });
+    return false;
+  }
+  if (!canModifyBankItem((req as AuthRequest).user!, owner.rows[0])) {
+    res.status(403).json({ success: false, message: COLLECTION_FORBIDDEN });
+    return false;
+  }
+  return true;
+}
 
 // ── List all collections, with a question count for each
 export const getCollections = async (req: Request, res: Response) => {
@@ -96,6 +122,7 @@ export const updateCollection = async (req: Request, res: Response) => {
         .json({ success: false, message: "Collection name is required." });
       return;
     }
+    if (!(await checkCollectionOwner(req, res, Number(id)))) return;
 
     const result = await pool.query(
       `UPDATE quiz_bank_collections SET name = $1, description = $2, updated_at = NOW()
@@ -189,6 +216,7 @@ export const deleteCollection = async (req: Request, res: Response) => {
       res.status(400).json({ success: false, message: "Invalid ID." });
       return;
     }
+    if (!(await checkCollectionOwner(req, res, Number(id)))) return;
 
     const impact = await pool.query(
       `SELECT

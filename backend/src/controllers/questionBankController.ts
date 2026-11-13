@@ -8,6 +8,38 @@ import {
   mapQuestionData,
   normalizeCategories,
 } from "../utils/quizQuestions";
+import {
+  canModifyBankItem,
+  QUESTION_FORBIDDEN,
+  ADD_TO_COLLECTION_FORBIDDEN,
+} from "../utils/bankOwnership";
+
+// A question may only be added to (or moved into) a collection the caller
+// may change. Answers 400 (collection gone) or 403 (not yours); returns
+// true when it's allowed.
+async function checkTargetCollection(
+  req: Request,
+  res: Response,
+  collectionId: number,
+): Promise<boolean> {
+  const owner = await pool.query(
+    `SELECT created_by_id, created_by_role FROM quiz_bank_collections WHERE id = $1`,
+    [collectionId],
+  );
+  if (owner.rows.length === 0) {
+    res
+      .status(400)
+      .json({ success: false, message: "That collection no longer exists." });
+    return false;
+  }
+  if (!canModifyBankItem((req as AuthRequest).user!, owner.rows[0])) {
+    res
+      .status(403)
+      .json({ success: false, message: ADD_TO_COLLECTION_FORBIDDEN });
+    return false;
+  }
+  return true;
+}
 
 // Shared shape for a bank row → API response, used by all three handlers
 // below so the response shape can't drift between them.
@@ -136,6 +168,7 @@ export const createBankQuestion = async (req: Request, res: Response) => {
         .json({ success: false, message: "A collection is required." });
       return;
     }
+    if (!(await checkTargetCollection(req, res, collectionId))) return;
 
     const normalized = normalizeCategories(q.categories);
     if ("error" in normalized) {
@@ -203,13 +236,26 @@ export const updateBankQuestion = async (req: Request, res: Response) => {
     }
 
     const existing = await pool.query(
-      `SELECT question_data FROM question_bank WHERE id = $1`,
+      `SELECT question_data, collection_id, created_by_id, created_by_role
+       FROM question_bank WHERE id = $1`,
       [id],
     );
     if (existing.rows.length === 0) {
       res
         .status(404)
         .json({ success: false, message: "Bank question not found." });
+      return;
+    }
+    if (!canModifyBankItem((req as AuthRequest).user!, existing.rows[0])) {
+      res.status(403).json({ success: false, message: QUESTION_FORBIDDEN });
+      return;
+    }
+    // Only a move is checked against the target collection, so an owner can
+    // still edit a question that already sits in someone else's collection.
+    if (
+      collectionId !== Number(existing.rows[0].collection_id) &&
+      !(await checkTargetCollection(req, res, collectionId))
+    ) {
       return;
     }
 
@@ -274,6 +320,21 @@ export const deleteBankQuestion = async (req: Request, res: Response) => {
     const { id } = req.params;
     if (isNaN(Number(id))) {
       res.status(400).json({ success: false, message: "Invalid ID." });
+      return;
+    }
+
+    const owner = await pool.query(
+      `SELECT created_by_id, created_by_role FROM question_bank WHERE id = $1`,
+      [id],
+    );
+    if (owner.rows.length === 0) {
+      res
+        .status(404)
+        .json({ success: false, message: "Bank question not found." });
+      return;
+    }
+    if (!canModifyBankItem((req as AuthRequest).user!, owner.rows[0])) {
+      res.status(403).json({ success: false, message: QUESTION_FORBIDDEN });
       return;
     }
 

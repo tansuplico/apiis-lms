@@ -38,6 +38,8 @@ import { questionBankService } from "@/services/questionBankService";
 import { quizBankCollectionService } from "@/services/bankCollectionService";
 import { collectCategories, hasCategory } from "@/utils/bankCategories";
 import FilterDropdown from "@/components/shared/FilterDropdown";
+import { useBankViewer } from "@/hooks/useBankViewer";
+import { canModifyBankItem } from "@/utils/bankOwnership";
 
 // ── Types
 interface CourseQuizProps {
@@ -131,6 +133,7 @@ export default function CourseQuiz({
   const [score, setScore] = useState(0);
 
   const [promotingIds, setPromotingIds] = useState<Set<number>>(new Set());
+  const bankViewer = useBankViewer();
 
   // ── Collections (shared by the "Add from Bank" browser and the
   // "promote to bank" collection-choice prompt below)
@@ -168,7 +171,12 @@ export default function CourseQuiz({
 
   const cancelPromoteToBank = () => setPromotingQuestion(null);
 
-  const filteredPromoteCollections = bankCollections.filter((c) =>
+  // Questions can only be added to collections the viewer may change (their
+  // own; admins: any). The server enforces the same rule.
+  const promotableCollections = bankCollections.filter((c) =>
+    canModifyBankItem(bankViewer, c),
+  );
+  const filteredPromoteCollections = promotableCollections.filter((c) =>
     c.name.toLowerCase().includes(promoteCollectionSearch.trim().toLowerCase()),
   );
 
@@ -1833,10 +1841,10 @@ export default function CourseQuiz({
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Loading...
                 </p>
-              ) : bankCollections.length === 0 ? (
+              ) : promotableCollections.length === 0 ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No collections yet. Create one from the Question Bank page
-                  first.
+                  You have no collections to add to yet. Create one from the
+                  Question Bank page first.
                 </p>
               ) : (
                 <>
