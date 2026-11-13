@@ -1,6 +1,6 @@
 // src/services/refreshService.ts
 import { isOnline } from "./networkStatus";
-import { syncCoursesToLocal } from "./syncService";
+import { syncCoursesInBackground } from "./syncService";
 import { useStudentStore } from "@/stores/useStudentStore";
 import { useCourseStore } from "@/stores/useCourseStore";
 import { useCenterStore } from "@/stores/useCenterStore";
@@ -36,10 +36,9 @@ export async function refreshAppData(): Promise<void> {
     }
 
     if (isStudent && fetchedFresh) {
-      const embedded = await syncCoursesToLocal(
-        useCourseStore.getState().courses,
-      );
-      useCourseStore.getState().applyEmbeddedContent(embedded);
+      // Throw as before, so the Refresh button still reports a failed sync.
+      const syncError = await syncCoursesInBackground();
+      if (syncError) throw syncError;
     }
   } finally {
     inFlight = false;

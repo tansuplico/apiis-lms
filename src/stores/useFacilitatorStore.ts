@@ -59,13 +59,8 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         6000,
         true,
       );
+      // The shop is fetched by App.tsx alongside the other startup data.
       set({ currentFacilitator: facilitator, isAuthenticated: true });
-
-      try {
-        await useShopStore.getState().fetchItems();
-      } catch (err) {
-        console.error("fetchItems failed during restoreSession:", err);
-      }
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         await tokenStorage.clearAllTokens();
@@ -86,11 +81,14 @@ export const useFacilitatorStore = create<FacilitatorStore>()((set, get) => ({
         facilitatorService.login(email, password),
       );
       if (!facilitator.mustChangePassword) {
-        await useShopStore.getState().fetchItems();
-        await useCenterStore.getState().fetchCenters();
-        await useCourseStore.getState().fetchCourses();
-        await useStudentListStore.getState().fetchStudents();
-        await useQuizBankCollectionStore.getState().fetchCollections();
+        // Independent loads, run together (one wait instead of five).
+        await Promise.all([
+          useShopStore.getState().fetchItems(),
+          useCenterStore.getState().fetchCenters(),
+          useCourseStore.getState().fetchCourses(),
+          useStudentListStore.getState().fetchStudents(),
+          useQuizBankCollectionStore.getState().fetchCollections(),
+        ]);
       }
       set({ currentFacilitator: facilitator, isAuthenticated: true });
     } finally {

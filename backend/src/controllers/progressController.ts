@@ -361,46 +361,47 @@ export const getStudentProgress = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    const student = await pool.query(`SELECT id FROM students WHERE id = $1`, [
-      studentId,
+    // Independent reads, so they run together: one round trip of waiting
+    // instead of six (this endpoint runs on every student start).
+    const [
+      student,
+      progressResult,
+      completedPartsResult,
+      quizAnswersResult,
+      accessoriesResult,
+      coinsResult,
+    ] = await Promise.all([
+      pool.query(`SELECT id FROM students WHERE id = $1`, [studentId]),
+      pool.query(
+        `SELECT scp.course_id, scp.last_visited_module,
+                scp.last_visited_part, scp.updated_at
+         FROM student_course_progress scp
+         WHERE scp.student_id = $1`,
+        [studentId],
+      ),
+      pool.query(
+        `SELECT course_id, module_number, part_slug, completed_at
+         FROM student_completed_parts
+         WHERE student_id = $1`,
+        [studentId],
+      ),
+      pool.query(
+        `SELECT course_id, module_number, answers
+         FROM student_quiz_answers
+         WHERE student_id = $1`,
+        [studentId],
+      ),
+      pool.query(
+        `SELECT accessory_id FROM student_accessories WHERE student_id = $1`,
+        [studentId],
+      ),
+      pool.query(`SELECT coins FROM students WHERE id = $1`, [studentId]),
     ]);
 
     if (student.rows.length === 0) {
       res.status(404).json({ success: false, message: "Student not found." });
       return;
     }
-
-    const progressResult = await pool.query(
-      `SELECT scp.course_id, scp.last_visited_module,
-              scp.last_visited_part, scp.updated_at
-       FROM student_course_progress scp
-       WHERE scp.student_id = $1`,
-      [studentId],
-    );
-
-    const completedPartsResult = await pool.query(
-      `SELECT course_id, module_number, part_slug, completed_at
-       FROM student_completed_parts
-       WHERE student_id = $1`,
-      [studentId],
-    );
-
-    const quizAnswersResult = await pool.query(
-      `SELECT course_id, module_number, answers
-       FROM student_quiz_answers
-       WHERE student_id = $1`,
-      [studentId],
-    );
-
-    const accessoriesResult = await pool.query(
-      `SELECT accessory_id FROM student_accessories WHERE student_id = $1`,
-      [studentId],
-    );
-
-    const coinsResult = await pool.query(
-      `SELECT coins FROM students WHERE id = $1`,
-      [studentId],
-    );
 
     const courseProgress: Record<number, any> = {};
 

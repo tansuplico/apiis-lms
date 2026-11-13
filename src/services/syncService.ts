@@ -5,6 +5,36 @@ import {
 } from "@/utils/imageUtils";
 import { getLocalDb } from "./localDb";
 import { Course } from "@/types/types";
+// Circular import (useCourseStore imports this file too). Safe: the store is
+// only read inside syncCoursesInBackground, at call time.
+import { useCourseStore } from "@/stores/useCourseStore";
+
+// One sync at a time: a call while one is running waits for that run.
+let backgroundSync: Promise<Error | null> | null = null;
+
+// Copies the course store's current courses into the offline cache (SQLite)
+// and puts the image-embedded lesson HTML back into the store. Started
+// without awaiting at startup/login so it doesn't hold up the first screen;
+// Refresh awaits it. Never throws: resolves to the failure (or null), so
+// Refresh can still report it.
+export function syncCoursesInBackground(): Promise<Error | null> {
+  if (backgroundSync) return backgroundSync;
+  backgroundSync = (async () => {
+    try {
+      const embedded = await syncCoursesToLocal(
+        useCourseStore.getState().courses,
+      );
+      useCourseStore.getState().applyEmbeddedContent(embedded);
+      return null;
+    } catch (err) {
+      console.error("Background course sync failed:", err);
+      return err instanceof Error ? err : new Error(String(err));
+    } finally {
+      backgroundSync = null;
+    }
+  })();
+  return backgroundSync;
+}
 
 export async function syncCoursesToLocal(
   courses: Course[],

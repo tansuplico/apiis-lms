@@ -60,13 +60,8 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
         6000,
         true,
       );
+      // The shop is fetched by App.tsx alongside the other startup data.
       set({ currentAdmin: admin, isAuthenticated: true });
-
-      try {
-        await useShopStore.getState().fetchItems();
-      } catch (err) {
-        console.error("fetchItems failed during restoreSession:", err);
-      }
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         await tokenStorage.clearAllTokens();
@@ -86,13 +81,16 @@ export const useAdminStore = create<AdminStore>()((set, get) => ({
       const admin = await withNetworkRetry(() =>
         adminService.login(email, password),
       );
-      await useShopStore.getState().fetchItems();
-      await useCenterStore.getState().fetchCenters();
-      await useCourseStore.getState().fetchCourses();
-      await useStudentListStore.getState().fetchStudents();
-      await useFacilitatorListStore.getState().fetchFacilitators();
-      await useTicketStore.getState().fetchTickets();
-      await useQuizBankCollectionStore.getState().fetchCollections();
+      // Independent loads, run together (one wait instead of seven).
+      await Promise.all([
+        useShopStore.getState().fetchItems(),
+        useCenterStore.getState().fetchCenters(),
+        useCourseStore.getState().fetchCourses(),
+        useStudentListStore.getState().fetchStudents(),
+        useFacilitatorListStore.getState().fetchFacilitators(),
+        useTicketStore.getState().fetchTickets(),
+        useQuizBankCollectionStore.getState().fetchCollections(),
+      ]);
       set({ currentAdmin: admin, isAuthenticated: true });
     } finally {
       set({ isLoading: false });

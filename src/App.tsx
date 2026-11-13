@@ -18,6 +18,7 @@ import {
   saveLastPage,
 } from "./services/lastPageService";
 import type { Role } from "./types/types";
+import { useShopStore } from "./stores/useShopStore";
 
 import { useAdminStore } from "./stores/useAdminStore";
 import { useStudentStore } from "./stores/useStudentStore";
@@ -80,6 +81,10 @@ import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ThemeProvider } from "./hooks/useTheme";
 import UpdateNotifier from "./components/shared/UpdateNotifier";
 import { useLockRefresh } from "./hooks/useLockRefresh";
+
+// The one startup run for this app load (see the init effect in App).
+let initPromise: Promise<void> | null = null;
+
 // ── Sub‑component: NavigationRegistrar
 function NavigationRegistrar() {
   const navigate = useNavigate();
@@ -164,6 +169,8 @@ export default function App() {
       const isStudent = !!useStudentStore.getState().currentStudent;
       const studentAlreadyFetchedCourses =
         isStudent && studentRestoreResult?.coursesFetched;
+      const studentAlreadyFetchedCenters =
+        isStudent && studentRestoreResult?.centersFetched;
 
       // Group 2: all independent — run together
       const fetches: Promise<any>[] = [];
@@ -174,10 +181,15 @@ export default function App() {
       ) {
         fetches.push(fetchCourses());
       }
-      if (isAdmin || isFacilitator || isStudent) {
+      if (
+        (isAdmin || isFacilitator || isStudent) &&
+        !studentAlreadyFetchedCenters
+      ) {
         fetches.push(fetchCenters());
       }
       if (isAdmin || isFacilitator) {
+        // Students load the shop inside their own session restore.
+        fetches.push(useShopStore.getState().fetchItems());
         fetches.push(fetchStudents());
         fetches.push(fetchCollections());
       }
@@ -195,10 +207,10 @@ export default function App() {
         currentSessionUser(),
       );
       if (target) navigateTo(target);
-
-      setIsInitialized(true);
     };
-    init();
+    // Run startup once per app load: in dev, StrictMode calls this effect
+    // twice, which used to send every startup request twice.
+    (initPromise ??= init()).then(() => setIsInitialized(true));
   }, []);
 
   // ── Render: application routes

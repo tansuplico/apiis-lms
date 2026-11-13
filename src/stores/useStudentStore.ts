@@ -5,7 +5,7 @@ import { studentService } from "@/services/studentService";
 import { tokenStorage } from "@/services/tokenStorage";
 import { toast } from "react-toastify";
 import { useShopStore } from "./useShopStore";
-import { syncCoursesToLocal } from "@/services/syncService";
+import { syncCoursesInBackground } from "@/services/syncService";
 import { isOnline } from "@/services/networkStatus";
 import { useCourseStore } from "./useCourseStore";
 import {
@@ -32,7 +32,7 @@ interface StudentStore {
   isLoading: boolean;
   login: (idNumber: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  restoreSession: () => Promise<{ coursesFetched: boolean }>;
+  restoreSession: () => Promise<StudentRestoreResult>;
   updatePassword: (current: string, newPassword: string) => Promise<boolean>;
   updateProfile: (data: Partial<Student>) => Promise<boolean>;
   completePart: (
@@ -55,6 +55,43 @@ interface StudentStore {
   syncOfflineProgress: () => Promise<void>;
 }
 
+// What restoreSession already loaded, so App.tsx doesn't fetch it again.
+type StudentRestoreResult = { coursesFetched: boolean; centersFetched: boolean };
+const NOTHING_LOADED: StudentRestoreResult = {
+  coursesFetched: false,
+  centersFetched: false,
+};
+const ALL_LOADED: StudentRestoreResult = {
+  coursesFetched: true,
+  centersFetched: true,
+};
+
+// Loads a student's shop, courses and centers at the same time (each was a
+// separate wait before), then saves the courses for offline use in the
+// background when they came fresh from the server. Each failure is logged
+// and doesn't stop the others. (fetchCenters returns early when offline.)
+async function loadStudentData(context: string): Promise<{
+  coursesFresh: boolean;
+}> {
+  const [shop, courses, centers] = await Promise.allSettled([
+    useShopStore.getState().fetchItems(),
+    useCourseStore.getState().fetchCourses(),
+    useCenterStore.getState().fetchCenters(),
+  ]);
+  if (shop.status === "rejected") {
+    console.error(`fetchItems failed ${context}:`, shop.reason);
+  }
+  if (courses.status === "rejected") {
+    console.error(`fetchCourses failed ${context}:`, courses.reason);
+  }
+  if (centers.status === "rejected") {
+    console.error(`fetchCenters failed ${context}:`, centers.reason);
+  }
+  const coursesFresh = courses.status === "fulfilled" && courses.value;
+  if (coursesFresh) void syncCoursesInBackground();
+  return { coursesFresh };
+}
+
 export const useStudentStore = create<StudentStore>()((set, get) => ({
   // ── State
   currentStudent: null,
@@ -63,33 +100,22 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
   // ── Actions: restore session
   restoreSession: async () => {
-    const restoreFromLocalCache = async (): Promise<{
-      coursesFetched: boolean;
-    }> => {
+    const restoreFromLocalCache = async (): Promise<StudentRestoreResult> => {
       const localStudent = await loadLocalSession();
       if (localStudent) {
         set({ currentStudent: localStudent, isAuthenticated: true });
-        try {
-          await useShopStore.getState().fetchItems();
-        } catch (err) {
-          console.error("fetchItems failed restoring from cache:", err);
-        }
-        try {
-          await useCourseStore.getState().fetchCourses();
-        } catch (err) {
-          console.error("fetchCourses failed restoring from cache:", err);
-        }
-        return { coursesFetched: true };
+        await loadStudentData("restoring from cache");
+        return ALL_LOADED;
       }
-      return { coursesFetched: false };
+      return NOTHING_LOADED;
     };
 
     try {
       const role = await tokenStorage.getRole();
-      if (role !== "student") return { coursesFetched: false };
+      if (role !== "student") return NOTHING_LOADED;
 
       const token = await tokenStorage.getToken();
-      if (!token) return { coursesFetched: false };
+      if (!token) return NOTHING_LOADED;
 
       const payload = JSON.parse(atob(token.split(".")[1]));
 
@@ -101,7 +127,7 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
         await tokenStorage.clearAllTokens();
         await clearLocalSession();
         set({ currentStudent: null, isAuthenticated: false });
-        return { coursesFetched: false };
+        return NOTHING_LOADED;
       }
 
       // Retry 5xx too: a brief server hiccup shouldn't look like a logout.
@@ -129,36 +155,15 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
 
       // Best-effort secondary data — a failure here must not discard the
       // fresh, correct core identity fetch already committed above.
-      let fetchedFresh = false;
-      try {
-        await useShopStore.getState().fetchItems();
-      } catch (err) {
-        console.error("fetchItems failed during restoreSession:", err);
-      }
-      try {
-        fetchedFresh = await useCourseStore.getState().fetchCourses();
-      } catch (err) {
-        console.error("fetchCourses failed during restoreSession:", err);
-      }
-      try {
-        await useCenterStore.getState().fetchCenters();
-      } catch (err) {
-        console.error("fetchCenters failed during restoreSession:", err);
-      }
-      if (fetchedFresh) {
-        const embedded = await syncCoursesToLocal(
-          useCourseStore.getState().courses,
-        );
-        useCourseStore.getState().applyEmbeddedContent(embedded);
-      }
+      await loadStudentData("during restoreSession");
 
-      return { coursesFetched: true };
+      return ALL_LOADED;
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         await tokenStorage.clearAllTokens();
         await clearLocalSession();
         set({ currentStudent: null, isAuthenticated: false });
-        return { coursesFetched: false };
+        return NOTHING_LOADED;
       }
 
       return await restoreFromLocalCache();
@@ -186,31 +191,8 @@ export const useStudentStore = create<StudentStore>()((set, get) => ({
     try {
       const progress = await studentService.getProgress();
 
-      try {
-        await useShopStore.getState().fetchItems();
-      } catch (err) {
-        console.error("fetchItems failed during login:", err);
-      }
+      await loadStudentData("during login");
 
-      let fetchedFresh = false;
-      try {
-        fetchedFresh = await useCourseStore.getState().fetchCourses();
-      } catch (err) {
-        console.error("fetchCourses failed during login:", err);
-      }
-
-      try {
-        await useCenterStore.getState().fetchCenters();
-      } catch (err) {
-        console.error("fetchCenters failed during login:", err);
-      }
-
-      if (fetchedFresh) {
-        const embedded = await syncCoursesToLocal(
-          useCourseStore.getState().courses,
-        );
-        useCourseStore.getState().applyEmbeddedContent(embedded);
-      }
       const fullStudent: Student = {
         ...student,
         coins: progress.coins,
